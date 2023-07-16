@@ -21,7 +21,7 @@ $opts = { threads: 18, slice: 8000,
           idfile: "../../mozc/src/data/dictionary_oss/id.def"
 }
 op = OptionParser.new
-op.on("-e", "--english")
+op.on("-E", "--English")
 op.on("-s", "--symbol")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
 op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
@@ -156,7 +156,7 @@ SLICE_NUM=$opts[:slice]
 
       # 英語への変換はオプションによる (デフォルトスキップ)
       # 固有名詞は受け入れる
-      next if (!$opts[:english] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
+      next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
 
       # 「きごう」で変換される記号は多すぎて支障をきたすため、除外する
       next if (!$opts[:symbol] && yomi == "きごう" && clsexpr.include?("記号"))

@@ -16,7 +16,7 @@ $opts = { threads: 18, slice: 8000,
 }
 
 op = OptionParser.new
-op.on("-e", "--english")
+op.on("-E", "--English")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
 op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
 op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] = v }
@@ -138,7 +138,7 @@ file.each_slice(SLICE_NUM) do |rows|
 
     # 英語への変換はオプションによる (デフォルトスキップ)
     # 固有名詞は受け入れる
-    next if (!$opts[:english] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
+    next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
 
     generic_expr = [yomi, id, base].join(" ")
     if ALREADY[generic_expr]
