@@ -25,10 +25,7 @@ naist-jdic.csvがEUC-JPで配布されていましたので、-eオプション�
 入出力ともにUTF-8がデフォルトです。
 
 # ArchLinux向け AURパッケージ
-- [fcitx5-mozc-with-jp-dict](https://aur.archlinux.org/packages/fcitx5-mozc-with-jp-dict)  
-- [ibus-mozc-with-jp-dict](https://aur.archlinux.org/packages/ibus-mozc-with-jp-dict)  
-- [emacs-mozc-with-jp-dict](https://aur.archlinux.org/packages/emacs-mozc-with-jp-dict)  
-- [mozc-with-jp-dict-common](https://aur.archlinux.org/packages/mozc-with-jp-dict-common)    
+- [mozc-with-jp-dict](https://aur.archlinux.org/pkgbase/mozc-with-jp-dict)
 にて、AURパッケージを公開しました。
 
 ---
