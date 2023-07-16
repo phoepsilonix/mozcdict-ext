@@ -21,7 +21,7 @@ ruby sudachi/sudachi.rb -i id.def -f sudachi/src/core_lex.csv sudachi/src/notcor
 ```
 -iオプションでmozcのid.defファイルを指定します。  
 -fオプションで辞書ファイルを指定します。  
-naist-jdic.csvがEUC-JPで配布されていましたので、-eオプションもつけました。  
+naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオプションもつけました。被っていた、--englishオプションは、-E、--Englishに変更しました。
 入出力ともにUTF-8がデフォルトです。
 
 # ArchLinux向け AURパッケージ
