@@ -8,6 +8,7 @@ mozcのパッケージ作成において、システム辞書として、有志�
 - [sudachidict](https://github.com/WorksApplications/SudachiDict)  
 - [NAIST Japanese Dictionary](https://osdn.net/projects/naist-jdic/)  
 を、mozcdict-extのスクリプトをベースに、それぞれをmozc用の辞書に変換するスクリプトを公開しているリポジトリです。 
+parallelの使用により、変換時間の短縮を図っています。
 mozcdict-extをベースにしているので、私が書いたスクリプト自体はGPLライセンスになるかと思います。  
 このスクリプトによって生成される辞書ファイルについては、GPLライセンスの適用外になります。  
 ですから、それぞれの辞書の元データのライセンスに基づいて、配布は可能になるかと思います。  
@@ -19,17 +20,18 @@ ruby mecab-naist-jdic/mecab-naist-jdic.rb -i id.def -f mecab-naist-jdic-0.6.3b-2
 ruby utdict/utdict.rb -i id.def -f ut-dictionary1 ut-dictionary2 ...
 ruby sudachi/sudachi.rb -i id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv 
 ```
+-iオプションでmozcのid.defファイルを指定します。  
+-fオプションで辞書ファイルを指定します。  
+naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオプションもつけました。被っていた、--englishオプションは、-E、--Englishに変更しました。
+入出力ともにUTF-8がデフォルトです。
+
 ユーザー辞書への変換
 ```
 ruby utdict/user_dict.rb -i id.def -u user_dic_id.def -f ut-dictionary1 ut-dictionary2 ... >all.txt
 ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv >> all.txt 
 split -l 100000 --additional-suffix=.txt all.txt user-dict-
 ```
-
--iオプションでmozcのid.defファイルを指定します。  
--fオプションで辞書ファイルを指定します。  
-naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオプションもつけました。被っていた、--englishオプションは、-E、--Englishに変更しました。
-入出力ともにUTF-8がデフォルトです。
+-uオプションでユーザー辞書への変換用のファイルを指定します。
 
 # ArchLinux向け AURパッケージ
 - [mozc-with-jp-dict](https://aur.archlinux.org/pkgbase/mozc-with-jp-dict)
