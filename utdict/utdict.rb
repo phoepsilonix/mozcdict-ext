@@ -90,7 +90,7 @@ file.each_slice(SLICE_NUM) do |rows|
 
     # 英語への変換はオプションによる (デフォルトスキップ)
     # 固有名詞は受け入れる
-    next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !id.include?("固有名詞") )
+    next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !ID_DEF.key(id.to_s).include?("固有名詞") )
 
     generic_expr = [yomi, id,  base].join(" ")
     if ALREADY[generic_expr]
