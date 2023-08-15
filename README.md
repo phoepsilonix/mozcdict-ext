@@ -19,6 +19,13 @@ ruby mecab-naist-jdic/mecab-naist-jdic.rb -i id.def -f mecab-naist-jdic-0.6.3b-2
 ruby utdict/utdict.rb -i id.def -f ut-dictionary1 ut-dictionary2 ...
 ruby sudachi/sudachi.rb -i id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv 
 ```
+ユーザー辞書への変換
+```
+ruby utdict/user_dict.rb -i id.def -u user_dic_id.def -f ut-dictionary1 ut-dictionary2 ... >all.txt
+ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv >> all.txt 
+split -l 100000 --additional-suffix=.txt all.txt user-dict-
+```
+
 -iオプションでmozcのid.defファイルを指定します。  
 -fオプションで辞書ファイルを指定します。  
 naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオプションもつけました。被っていた、--englishオプションは、-E、--Englishに変更しました。
