@@ -22,7 +22,7 @@ $opts = { threads: 18, slice: 8000,
 }
 op = OptionParser.new
 op.on("-E", "--English")
-op.on("-s", "--symbol")
+op.on("-S", "--Symbol")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
 op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
 op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] = v }
@@ -159,7 +159,7 @@ SLICE_NUM=$opts[:slice]
       next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
 
       # 「きごう」で変換される記号は多すぎて支障をきたすため、除外する
-      next if (!$opts[:symbol] && yomi == "きごう" && clsexpr.include?("記号"))
+      next if (!$opts[:Symbol] && yomi == "きごう" && clsexpr.include?("記号"))
 
       generic_expr = [yomi, id, base].join(" ")
       if ALREADY[generic_expr]
