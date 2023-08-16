@@ -29,7 +29,7 @@ naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオ�
 ```
 ruby utdict/user_dict.rb -i id.def -u user_dic_id.def -f ut-dictionary1 ut-dictionary2 ... >all.txt
 ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv >> all.txt 
-split -l 100000 --additional-suffix=.txt all.txt user-dict-
+split -l 1000000 --additional-suffix=.txt all.txt user-dict-
 ```
 -uオプションでユーザー辞書への変換用のファイルを指定します。
 
