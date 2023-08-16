@@ -11,7 +11,8 @@ ROUND = !(ENV["WORDCLASS_ROUND"]&.downcase == "no")
 ERROR_UNEXPECTED_CLS = ENV["ERROR_ON_UNEXPECTED_CLASS"]&.downcase == "yes"
 #####################
 
-CLASS_MAP = YAML.load(File.read("clsmap.yaml"))
+#CLASS_MAP = YAML.load(File.read("clsmap.yaml"))
+CLASS_MAP = {}
 
 ID_DEF = {}
 ALREADY = {}
@@ -47,6 +48,10 @@ File.open(MOZC_ID_FILE, "r") do |f|
     expr = expr.split(",")
     expr.pop
     expr = expr.join(",")
+    expr.sub!(/五段・/, '五段-') 
+    expr.sub!(/五段-カ行[^,]*/, '五段-カ行') 
+    expr.sub!(/ラ行([^,])/, 'ラ行,\1') 
+    expr.sub!(/形-/,"形,")
     ID_DEF[expr] = id
   end
 end
@@ -64,7 +69,7 @@ def id_expr(clsexpr)
       i = h.split(",")
       i.each do |y|
         case y
-        when "*","自立","非自立"
+        when "*","自立","非自立","一般"
           next
         end
         if x == y
@@ -124,6 +129,7 @@ $opts[:filename].each do |source_file|
       # 「名」をスキップ => しない
 
       clsexpr = [cls1, cls2, cls3, cls4, cls5, cls6].join(",")
+      clsexpr.sub!(/形-/,"形,")
       cost = cost.to_i
 
       # コスト計算の処理はMozc-UTに倣っている

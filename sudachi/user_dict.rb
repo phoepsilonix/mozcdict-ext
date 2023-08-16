@@ -11,7 +11,8 @@ ROUND = !(ENV["WORDCLASS_ROUND"]&.downcase == "no")
 ERROR_UNEXPECTED_CLS = ENV["ERROR_ON_UNEXPECTED_CLASS"]&.downcase == "yes"
 #####################
 
-CLASS_MAP = YAML.load(File.read("clsmap.yaml"))
+#CLASS_MAP = YAML.load(File.read("clsmap.yaml"))
+CLASS_MAP = {}
 
 ID_DEF = {}
 ALREADY = {}
@@ -19,12 +20,12 @@ USER_DIC_ID_DEF = {}
 
 $opts = { threads: 18, slice: 8000,
           filename: [ ],
-          idfile: "../../mozc/src/data/dictionary_oss/id.def",
+          idfile: "id.def",
           useridfile: "user_dic_id.def"
 }
 op = OptionParser.new
 op.on("-E", "--English")
-op.on("-s", "--symbol")
+op.on("-S", "--Symbol")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
 op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
 op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] |= [v] }
@@ -50,10 +51,14 @@ File.open(MOZC_ID_FILE, "r") do |f|
     expr = expr.split(",")
     expr.pop
     expr = expr.join(",")
+    expr.sub!(/五段・/, '五段-') 
+    expr.sub!(/五段-カ行[^,]*/, '五段-カ行') 
+    expr.sub!(/ラ行([^,])/, 'ラ行,\1') 
+    expr.sub!(/形-/,"形,")
     ID_DEF[expr] = id
   end
 end
-
+#STDERR.puts ID_DEF
 # Load User Dictionary MOZC ID definition.
 File.open($opts[:useridfile] , "r") do |f|
   f.each do |line|
@@ -75,7 +80,7 @@ def id_expr(clsexpr)
       i = h.split(",")
       i.each do |y|
         case y
-        when "*","自立","非自立"
+        when "*","自立","非自立","一般"
           next
         end
         if x == y
@@ -135,6 +140,7 @@ $opts[:filename].each do |source_file|
       # 「名」をスキップ => しない
 
       clsexpr = [cls1, cls2, cls3, cls4, cls5, cls6].join(",")
+      clsexpr.sub!(/形-/,"形,")
       cost = cost.to_i
 
       # コスト計算の処理はMozc-UTに倣っている
@@ -164,13 +170,14 @@ $opts[:filename].each do |source_file|
           ERROR_UNEXPECTED_CLS ? abort("Unexpected Word Class #{clsexpr}") : next
         end
       end
+      #STDERR.puts [row, clsexpr, id, ID_DEF[id.to_i]].join("\t")
 
       # 英語への変換はオプションによる (デフォルトスキップ)
       # 固有名詞は受け入れる
       next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
 
       # 「きごう」で変換される記号は多すぎて支障をきたすため、除外する
-      next if (!$opts[:symbol] && yomi == "きごう" && clsexpr.include?("記号"))
+      next if (!$opts[:Symbol] && yomi == "きごう" && clsexpr.include?("記号"))
 
       generic_expr = [yomi, id, base].join(" ")
       if ALREADY[generic_expr]
@@ -178,6 +185,7 @@ $opts[:filename].each do |source_file|
       else
         ALREADY[generic_expr] = true
         #line_expr = [yomi, id, id, mozc_cost, base]
+        #line_expr = [yomi, base, USER_DIC_ID_DEF[id.to_i], id, clsexpr ]
         line_expr = [yomi, base, USER_DIC_ID_DEF[id.to_i], "" ]
       end
     end
@@ -187,4 +195,5 @@ $opts[:filename].each do |source_file|
       puts x.join("\t")
     }
   end
+  #STDERR.puts CLASS_MAP
 end
