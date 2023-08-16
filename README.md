@@ -22,7 +22,7 @@ ruby sudachi/sudachi.rb -i id.def -f sudachi/src/core_lex.csv sudachi/src/notcor
 -iオプションでmozcのid.defファイルを指定します。  
 -fオプションで辞書ファイルを指定します。  
 naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオプションもつけました。被っていた、--englishオプションは、-E、--Englishに変更しました。
-入出力ともにUTF-8がデフォルトです。
+入出力ともにUTF-8がデフォルトです。--symbolオプションも--Symbolまたは-Sに変更しています。
 
 ユーザー辞書への変換
 ```
@@ -31,6 +31,7 @@ ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/core_le
 split -d -l 1000000 --additional-suffix=.txt all.txt user-dict-
 ```
 -uオプションでユーザー辞書への変換用のファイルを指定します。
+ユーザー辞書は一つの辞書の上限が100万件です。上記は、splitコマンドで分割しています。
 
 # ArchLinux向け AURパッケージ
 - [mozc-with-jp-dict](https://aur.archlinux.org/pkgbase/mozc-with-jp-dict)
