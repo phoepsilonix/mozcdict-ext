@@ -6,7 +6,6 @@ mozcのパッケージ作成において、システム辞書として、有志�
 - [Merge UT Dictionaries merges multiple Mozc UT dictionaries into one and modify the costs.](https://github.com/utuhiro78/merge-ut-dictionaries)  
 このレポジトリにおいては、上記で公開されているUT辞書と、 
 - [sudachidict](https://github.com/WorksApplications/SudachiDict)  
-- [NAIST Japanese Dictionary](https://osdn.net/projects/naist-jdic/)  
 を、mozcdict-extのスクリプトをベースに、それぞれをmozc用の辞書に変換するスクリプトを公開しているリポジトリです。 
 parallelの使用により、変換時間の短縮を図っています。
 mozcdict-extをベースにしているので、私が書いたスクリプト自体はGPLライセンスになるかと思います。  
