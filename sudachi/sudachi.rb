@@ -17,7 +17,7 @@ ID_DEF = {}
 ALREADY = {}
 
 $opts = { threads: 18, slice: 8000,
-          filename: [ "src/core_lex.csv", "src/notcore_lex.csv" ],
+          filename: [ ],
           idfile: "../../mozc/src/data/dictionary_oss/id.def"
 }
 op = OptionParser.new
@@ -25,7 +25,7 @@ op.on("-E", "--English")
 op.on("-S", "--Symbol")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
 op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
-op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] = v }
+op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] |= [ v ]}
 op.on('-iVAL', '--idfile=VAL', String ){ |v| $opts[:idfile] = v }
 op.on('-eVAL', '--encoding=VAL', String ) { |v| 
   $opts[:fileencoding] = v
@@ -90,7 +90,7 @@ SLICE_NUM=$opts[:slice]
 # 見出し (TRIE 用),左連接ID,右連接ID,コスト,見出し (解析結果表示用), 品詞1,品詞2,品詞3,品詞4,品詞 (活用型),品詞 (活用形), 読み,正規化表記,辞書形ID,分割タイプ,A単位分割情報,B単位分割情報,※未使用
 
 #["src/core_lex.csv", "src/notcore_lex.csv"].each do |source_file|
-[$opts[:filename]].each do |source_file|
+$opts[:filename].each do |source_file|
   file = CSV.open(source_file, "r", encoding: $opts[:fileencoding], liberal_parsing: false)
   file.each_slice(SLICE_NUM) do |rows|
     results = Parallel.map(rows, in_threads: THREAD_NUM) do | row |
