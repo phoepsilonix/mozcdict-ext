@@ -64,6 +64,10 @@ file.each_slice(SLICE_NUM) do |rows|
     next if /[\p{hiragana}\p{katakana}]/ !~ yomi
     # 名詞以外の場合はスキップ => しない
 
+    # Unicode エスケープ
+    yomi.gsub!(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') }
+    base.gsub!(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') }
+
     cost = cost.to_i
 
     ##### List class (develop feature) #####
