@@ -55,6 +55,7 @@ File.open(MOZC_ID_FILE, "r") do |f|
     expr.sub!(/五段-カ行[^,]*/, '五段-カ行') 
     expr.sub!(/ラ行([^,])/, 'ラ行,\1') 
     expr.sub!(/形-/,"形,")
+    expr.sub!(/助動詞/,"動詞")
     ID_DEF[expr] = id
   end
 end
@@ -125,7 +126,6 @@ $opts[:filename].each do |source_file|
       #next if kana =~ /[^\p{hiragana}\p{katakana}ー]/
 
       yomi = NKF.nkf("--hiragana -w -W", kana).tr("ゐゑ", "いえ")
-
       # 見出し (解析結果表示用)を表記とみなす
       base = head_anal
 

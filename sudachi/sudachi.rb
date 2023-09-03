@@ -52,6 +52,7 @@ File.open(MOZC_ID_FILE, "r") do |f|
     expr.sub!(/五段-カ行[^,]*/, '五段-カ行') 
     expr.sub!(/ラ行([^,])/, 'ラ行,\1') 
     expr.sub!(/形-/,"形,")
+    expr.sub!(/助動詞/,"動詞")
     ID_DEF[expr] = id
   end
 end
