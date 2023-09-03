@@ -51,11 +51,10 @@ File.open(MOZC_ID_FILE, "r") do |f|
     expr = expr.split(",")
     expr.pop
     expr = expr.join(",")
-    expr.sub!(/五段・/, '五段-') 
-    expr.sub!(/五段-カ行[^,]*/, '五段-カ行') 
-    expr.sub!(/ラ行([^,])/, 'ラ行,\1') 
-    expr.sub!(/形-/,"形,")
-    expr.sub!(/助動詞/,"動詞")
+    expr.gsub!(/五段・/, '五段-') 
+    expr.gsub!(/五段-カ行[^,]*/, '五段-カ行') 
+    expr.gsub!(/ラ行([^,])/, 'ラ行,\1') 
+    expr.gsub!(/形-/,"形,")
     ID_DEF[expr] = id
   end
 end
@@ -71,6 +70,7 @@ end
 # 一番近いだろう品詞を求める。
 # 単純な判定なので、誤る場合もあります。
 def id_expr(clsexpr)
+  clsexpr.gsub!("助動詞","動詞") if clsexpr.include?("助動詞")
   expr=clsexpr.split(",")
   r=nil
   q=0
