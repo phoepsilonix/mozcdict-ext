@@ -117,7 +117,7 @@ $opts[:filename].each do |source_file|
           x.replace(NKF.nkf('-w', x))
         end
       end
-      surface, lcxid, rcxid, cost, cls1, cls2, cls3, cls4, cls5, cls6, base, kana, pron = row
+      #surface, lcxid, rcxid, cost, cls1, cls2, cls3, cls4, cls5, cls6, base, kana, pron = row
       head_trie, lid, rid, cost, head_anal, cls1, cls2, cls3, cls4, cls5, cls6, kana, normal, did, dtype, adiv, bdiv = *row
 
       # 読みがかなで構成されていないものを除外する
@@ -144,7 +144,7 @@ $opts[:filename].each do |source_file|
       # 「名」をスキップ => しない
 
       clsexpr = [cls1, cls2, cls3, cls4, cls5, cls6].join(",")
-      clsexpr.sub!(/形-/,"形,")
+      clsexpr.gsub!(/形-/,"形,")
       cost = cost.to_i
 
       # コスト計算の処理はMozc-UTに倣っている
