@@ -17,6 +17,7 @@ mkdir src
 #print http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/20230110/core_lex.zip
 #print http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/$date/core_lex.zip
 
+curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/$latest_date/small_lex.zip" -o upstream/small_lex.zip
 curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/$latest_date/core_lex.zip" -o upstream/core_lex.zip
 curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/$latest_date/notcore_lex.zip" -o upstream/notcore_lex.zip
 
@@ -27,5 +28,7 @@ curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/
     unzip -d ../src $i
   done
 ) > /dev/null
-
+exit
 ruby sudachi.rb $@
+ruby sudachi.rb -i ../id.def -f src/small_lex.csv -f src/core_lex.csv -f src/notcore_lex.csv > ../sudachi.txt
+

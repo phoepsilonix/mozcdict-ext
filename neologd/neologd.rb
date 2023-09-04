@@ -128,9 +128,9 @@ $opts[:filename].each do |source_file|
       # next unless head_trie.casecmp(conv_to).zero?
 
       # 名詞以外の場合はスキップ => しない
-      # 「地名」をスキップ。地名は郵便番号ファイルから生成する => 踏襲
-      next if cls3 == "地名"
-      # 「名」をスキップ => しない
+      # 「地域」をスキップ。地名は郵便番号ファイルから生成する => 踏襲
+      # 「人名」をスキップ => する
+      next if cls3 == "地域" or cls3 == "人名"
 
       clsexpr = [cls1, cls2, cls3, cls4, cls5, cls6].join(",")
       clsexpr.sub!(/形-/,"形,")
