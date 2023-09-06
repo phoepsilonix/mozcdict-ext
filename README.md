@@ -39,8 +39,8 @@ split -d -l 1000000 --additional-suffix=.txt all.txt user-dict-
 現在、Apache License Version 2.0の辞書データのみ、有効にしています。  
 それ以外の辞書データをシステム辞書に組み込みたい場合には、PKGBUILDのコメントアウトを取り除いて、ビルドしてください。(コメントアウト後、updpkgsumsコマンドを使うと簡単です。)   
 sudachidictとneologdについては、[fork of mozcditc-ext](https://github.com/phoepsilonix/mozcdict-ext)の形で品詞の分類を行っています。  
-それ以外の、辞書をユーザー辞書として取り込みたい場合には、こちらを参考にしてください。  
-[phoepsilonix/merge-ut-dictionaries: Merge UT Dictionaries merges multiple Mozc UT dictionaries into one and modify the costs.](https://github.com/phoepsilonix/merge-ut-dictionaries/)
+ユーザー辞書として取り込みたい場合には、こちらにユーザー辞書形式の生成データがありますので、ご活用してください。  
+[phoepsilonix/merge-ut-dictionaries: Merge UT Dictionaries merges multiple Mozc UT dictionaries into one and modify the costs.](https://github.com/phoepsilonix/merge-ut-dictionaries/)  
 
 ---
 # mozcdict-ext
