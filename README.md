@@ -17,7 +17,7 @@ mozcdict-extをベースにしているので、私が書いたスクリプト�
 ```
 ruby mecab-naist-jdic/mecab-naist-jdic.rb -i id.def -f mecab-naist-jdic-0.6.3b-20111013/naist-jdic.csv -e euc-jp
 ruby utdict/utdict.rb -i id.def -f ut-dictionary1 ut-dictionary2 ...
-ruby sudachi/sudachi.rb -i id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv 
+ruby sudachi/sudachi.rb -i id.def -f sudachi/src/small_lex.csv -f sudachi/src/core_lex.csv -f sudachi/src/notcore_lex.csv 
 ```
 -iオプションでmozcのid.defファイルを指定します。  
 -fオプションで辞書ファイルを指定します。  
@@ -27,7 +27,7 @@ naist-jdic.csvがEUC-JPで配布されていましたので、--encoding,-eオ�
 ユーザー辞書への変換
 ```
 ruby utdict/user_dict.rb -i id.def -u user_dic_id.def -f ut-dictionary1 ut-dictionary2 ... >all.txt
-ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/core_lex.csv sudachi/src/notcore_lex.csv >> all.txt 
+ruby sudachi/user_dict.rb.rb -i id.def -u user_dic_id.def -f sudachi/src/small_lex.csv -f sudachi/src/core_lex.csv -f sudachi/src/notcore_lex.csv  >> all.txt 
 split -d -l 1000000 --additional-suffix=.txt all.txt user-dict-
 ```
 -uオプションでユーザー辞書への変換用のファイルを指定します。
