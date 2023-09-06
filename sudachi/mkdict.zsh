@@ -29,6 +29,6 @@ curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/
   done
 ) > /dev/null
 exit
-ruby sudachi.rb $@
-ruby sudachi.rb -i ../id.def -f src/small_lex.csv -f src/core_lex.csv -f src/notcore_lex.csv > ../sudachi.txt
+#ruby sudachi.rb $@
+ruby sudachi.rb -E -i ../id.def -f src/small_lex.csv -f src/core_lex.csv -f src/notcore_lex.csv > ../sudachi.txt
 
