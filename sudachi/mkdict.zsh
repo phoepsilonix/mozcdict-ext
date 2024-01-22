@@ -30,5 +30,10 @@ curl -s "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/
 ) > /dev/null
 exit
 #ruby sudachi.rb $@
-ruby sudachi.rb -E -i ../id.def -f src/small_lex.csv -f src/core_lex.csv -f src/notcore_lex.csv > ../sudachi.txt
+#ruby sudachi.rb -E -i ../id.def -f src/small_lex.csv -f src/core_lex.csv -f src/notcore_lex.csv > ../sudachi.txt
+cargo build --release
+cat src/small_lex.csv src/core_lex.csv src/notcore_lex.csv > all.csv
+./target/release/sudachi-dic-to-mozc > ./sudachi.txt
+awk -f dup.awk ./sudachi.txt > ../sudachi.txt
+rm ./sudachi.txt
 
