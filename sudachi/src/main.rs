@@ -67,6 +67,21 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   Ok(_hash)
 }
 
+fn read_user_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
+  let mut _hash = HashMap::<String, i32>::new();
+  let mut reader = csv::ReaderBuilder::new()
+      .has_headers(false)
+      .delimiter(b" "[0])
+      .from_path(path)?;
+  for result in reader.records() {
+    let data = result?;
+    let id = data[0].parse::<i32>().unwrap();
+    let mut hinshi = &data[1];
+    _hash.insert(hinshi.to_string(), id);
+  }
+  Ok(_hash)
+}
+
 fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
   let mut class_map = HashMap::<String, i32>::new();
   let reader = csv::ReaderBuilder::new()
@@ -84,7 +99,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
             let data = record;
             if &data[11] == "キゴウ" && ( &data[5] == "記号" || &data[5] == "補助記号") { continue };
             if &data[5] == "空白" { continue };
-            if kigou_check.is_match(&data[4]) && &data[6] == "固有名詞" { continue };
+            if kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
             if ! kana_check.is_match(&data[11]) { continue };
             if chimei_check.is_match(&data[7]) { continue };
             let target = &data[11].to_string().chars().collect::<Vec<char>>();
@@ -157,8 +172,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
     if ! kana_check.is_match(&data[0]) { continue };
     let hinshi_id = data[1].parse::<i32>().unwrap();
     if kigou_check.is_match(&data[4]) && ! search(id_def, hinshi_id).contains("固有名詞") { continue };
-    let target = &data[0].to_string().chars().collect::<Vec<char>>();
-    let mut _yomi: String = UCSStr::convert(target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
+    let mut _yomi: String = (&data[4]).to_string();
     _yomi = _yomi.replace("ゐ", "い");
     _yomi = _yomi.replace("ゑ", "え");
     let s1 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &_yomi, |_, num: &str| {
@@ -204,6 +218,8 @@ fn main() -> Result<(), csv::Error> {
       sudachi_read_csv(&path, &mut id_def)?;
     } else if args[1] == "utdict" {
       utdict_read_csv(&path, &mut id_def)?;
+    } else if args[1] == "sudachi-userdict" {
+        path = Path::new("../user_dic_id.def");
     }
   }
   Ok(())
