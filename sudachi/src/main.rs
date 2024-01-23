@@ -100,7 +100,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
         let c: char = std::char::from_u32(num).unwrap();
         c.to_string()
     });
-    let s3 = &data[5].replace("補助記号", "記号").replace("空白","記号");
+    let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
     let s4 = &data[6];//.replace("普通名詞", "名詞");
     let s5 = &data[10].replace("形-", "形,");
     let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
