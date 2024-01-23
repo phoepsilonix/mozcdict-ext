@@ -48,7 +48,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
     hinshi.pop();
     let mut expr =  hinshi.join(",");
     expr = expr.replace("五段・", "五段-");
-    //expr = expr.replace("名詞,一般", "名詞,普通名詞");
+    expr = expr.replace("名詞,一般", "名詞,普通名詞");
     let mut re = Regex::new(r"五段-カ行[^,]*").unwrap();
     expr = re.replace(&expr, "五段-カ行").to_string();
     re = Regex::new(r"ラ行([^,]*)").unwrap();
@@ -90,18 +90,18 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
       .from_path(path);
   //let mut list = Vec::new();
   let kana_check = Regex::new(r"[ア-ン]").unwrap();
-  let chimei_check = Regex::new(r"地名").unwrap();
+  //let chimei_check = Regex::new(r"地名").unwrap();
   let kigou_check = Regex::new(r"^[a-zA-Z ]+$").unwrap();
   for result in reader?.records() {
     match result {
         Err(_err) => continue,
         Ok(record) => {
             let data = record;
-            if &data[11] == "キゴウ" && ( &data[5] == "記号" || &data[5] == "補助記号") { continue };
+            if &data[11] == "キゴウ" && data[5].contains("記号") { continue };
             if &data[5] == "空白" { continue };
             if kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
             if ! kana_check.is_match(&data[11]) { continue };
-            if chimei_check.is_match(&data[7]) { continue };
+            if data[7].contains("地名") { continue };
             let target = &data[11].to_string().chars().collect::<Vec<char>>();
             let mut _yomi: String = UCSStr::convert(target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
             _yomi = _yomi.replace("ゐ", "い");
