@@ -66,7 +66,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   }
   Ok(_hash)
 }
-
+/*
 fn read_user_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   let mut _hash = HashMap::<String, i32>::new();
   let mut reader = csv::ReaderBuilder::new()
@@ -81,7 +81,7 @@ fn read_user_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   }
   Ok(_hash)
 }
-
+*/
 fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
   let mut class_map = HashMap::<String, i32>::new();
   let reader = csv::ReaderBuilder::new()
@@ -201,26 +201,60 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
   Ok(())
 }
 
-fn main() -> Result<(), csv::Error> {
-  let mut path = Path::new("../id.def");
-  let mut id_def = read_id_def(&path)?;
-  let _p: String;
+fn brief(program: &str) -> String {
+    format!(
+        "Usage: {} [options]\n\n{}",
+        program, "Reads markdown from file or standard input and emits HTML.",
+    )
+}
 
-  let args: Vec<String> = env::args().collect();
-  if args.len() > 1 {
-    if args.len() > 2 {
-        _p = String::from(&args[2]);
-        path = Path::new(&_p);
-    } else {
-        path = Path::new("./all.csv");
+fn main() -> Result<(), csv::Error> {
+    let args: Vec<_> = env::args().collect();
+    let mut opts = getopts::Options::new();
+    opts.optflag("h", "help", "this help message");
+    opts.optopt("f", "csv_file", "csv file", "NAME");
+    opts.optopt("i", "id_def", "id_def file path", "NAME");
+    opts.optopt("U", "user_id_def", "user_id_def file path", "NAME");
+    opts.optflag("s", "sudachi", "Sudachi Dict");
+    opts.optflag("u", "utdict", "UT dict");
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => { panic!("{}", f.to_string()) }
+    };
+    if matches.opt_present("help") {
+        println!("{}", opts.usage(&brief(&args[0])));
+        return Ok(());
     }
-    if args[1] == "sudachi" {
-      sudachi_read_csv(&path, &mut id_def)?;
-    } else if args[1] == "utdict" {
-      utdict_read_csv(&path, &mut id_def)?;
-    } else if args[1] == "sudachi-userdict" {
-        path = Path::new("../user_dic_id.def");
+    
+    let mut csv_path: &Path = Path::new("./all.csv");
+    let mut id_def_path: &Path = Path::new("../id.def");
+    let mut user_id_def_path: &Path = Path::new("../user_dic_id.def");
+    let mut p1: String;
+    let mut p2: String;
+    let mut p3: String;
+
+    if matches.opt_present("csv_file") {
+        //csv_path = Path::new(&matches.opt_str("csv_file").unwrap_or("./all.csv".to_string()));
+        p1 = matches.opt_str("f").unwrap_or("./all.csv".to_string());
+        //p = String::from(&p);
+        csv_path = Path::new(&p1);
     }
-  }
-  Ok(())
+    if matches.opt_present("id_def") {
+        p2 = matches.opt_str("id_def").unwrap_or("../id.def".to_string());
+        //p = String::from(&p);
+        id_def_path = Path::new(&p2);
+    }
+    if matches.opt_present("user_id_def") {
+        p3 = matches.opt_str("user_id_def").unwrap_or("../user_dic_id.def".to_string());
+        user_id_def_path = Path::new(&p3);
+    }
+    if matches.opt_present("sudachi") {
+      let mut id_def = read_id_def(&id_def_path)?;
+      sudachi_read_csv(&csv_path, &mut id_def)?;
+    } else if matches.opt_present("utdict") {
+      let mut id_def = read_id_def(&id_def_path)?;
+      utdict_read_csv(&csv_path, &mut id_def)?;
+    }
+    Ok(())
 }
