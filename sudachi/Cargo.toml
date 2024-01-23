@@ -1,5 +1,5 @@
 [package]
-name = "sudachi-dic-to-mozc"
+name = "dict-to-mozc"
 version = "0.1.0"
 edition = "2021"
 

@@ -65,7 +65,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   Ok(_hash)
 }
 
-fn read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
+fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
   let mut class_map = HashMap::<String, i32>::new();
   let reader = csv::ReaderBuilder::new()
       .has_headers(false)

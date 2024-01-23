@@ -39,6 +39,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dict-to-mozc"
+version = "0.1.0"
+dependencies = [
+ "csv",
+ "kanaria",
+ "lazy-regex",
+ "regex",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,16 +169,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "sudachi-dic-to-mozc"
-version = "0.1.0"
-dependencies = [
- "csv",
- "kanaria",
- "lazy-regex",
- "regex",
 ]
 
 [[package]]

@@ -5,6 +5,8 @@ use kanaria::string::UCSStr;
 use kanaria::utils::ConvertTarget;
 use kanaria::string::ConvertType;
 use lazy_regex::*;
+use std::env;
+use std::path::PathBuf;
 
 fn id_expr(clsexpr: &String, id_def: &mut HashMap::<String, i32>, class_map: &mut HashMap::<String, i32>) -> i32 {
   let expr = clsexpr.split(',').collect::<Vec<_>>();
@@ -65,7 +67,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   Ok(_hash)
 }
 
-fn read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
+fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
   let mut class_map = HashMap::<String, i32>::new();
   let reader = csv::ReaderBuilder::new()
       .has_headers(false)
@@ -127,11 +129,81 @@ fn read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv:
   Ok(())
 }
 
+fn search(id_def: &HashMap::<String, i32>, search: i32) -> String {
+    for (key, value) in id_def {
+        if value == &search {
+            return key.to_string();
+        } else {
+            continue;
+        }
+    }
+    return "".to_string();
+}
+
+fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
+  let reader = csv::ReaderBuilder::new()
+      .has_headers(false)
+      .delimiter(b"\t"[0])
+      .from_path(path);
+  //let mut list = Vec::new();
+  let kana_check = Regex::new(r"[あ-ん]").unwrap();
+  let kigou_check = Regex::new(r"^[a-zA-Z ]+$").unwrap();
+  for result in reader?.records() {
+    match result {
+        Err(_err) => continue,
+        Ok(record) => {
+    let data = record;
+    if ! kana_check.is_match(&data[0]) { continue };
+    let hinshi_id = data[1].parse::<i32>().unwrap();
+    if kigou_check.is_match(&data[4]) && ! search(id_def, hinshi_id).contains("固有名詞") { continue };
+    let target = &data[0].to_string().chars().collect::<Vec<char>>();
+    let mut _yomi: String = UCSStr::convert(target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
+    _yomi = _yomi.replace("ゐ", "い");
+    _yomi = _yomi.replace("ゑ", "え");
+    let s1 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &_yomi, |_, num: &str| {
+        let num: u32 = u32::from_str_radix(num, 16).unwrap();
+        let c: char = std::char::from_u32(num).unwrap();
+        c.to_string()
+    });
+    let s2 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &data[4], |_, num: &str| {
+        let num: u32 = u32::from_str_radix(num, 16).unwrap();
+        let c: char = std::char::from_u32(num).unwrap();
+        c.to_string()
+    });
+    let mut cost = data[3].parse::<i32>().unwrap();
+    if cost < 0 {
+        cost = 8000;
+    } else if cost > 10000 {
+        cost = 10000;
+    } else {
+        cost = 6000 + (cost / 10);
+    }
+    //let class: String = format!("{},{},{},{},{},{},{},{},{}", s1, s2, s3, hinshi_id, &data[6], &data[7], &data[8], &data[9], s4);
+    println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+        }
+    }
+  }
+  Ok(())
+}
+
 fn main() -> Result<(), csv::Error> {
   let mut path = Path::new("../id.def");
   let mut id_def = read_id_def(&path)?;
-  path = Path::new("./all.csv");
+  let _p: String;
 
-  read_csv(&path, &mut id_def)?;
+  let args: Vec<String> = env::args().collect();
+  if args.len() > 1 {
+    if args.len() > 2 {
+        _p = String::from(&args[2]);
+        path = Path::new(&_p);
+    } else {
+        path = Path::new("./all.csv");
+    }
+    if args[1] == "sudachi" {
+      sudachi_read_csv(&path, &mut id_def)?;
+    } else if args[1] == "utdict" {
+      utdict_read_csv(&path, &mut id_def)?;
+    }
+  }
   Ok(())
 }
