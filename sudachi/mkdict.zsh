@@ -41,3 +41,21 @@ rm ./sudachi.txt
 ./target/$TARGET/release/dict-to-mozc -i ../id.def -f all.csv -s -U ../user_dic_id.def > ./user_dic-ut-sudachidict.txt
 awk -f dup.awk ./user_dic-ut-sudachidict.txt > ../user_dic-ut-sudachidict.txt
 
+TARGET="${target_arch}-${target_vendor}-${target_os}-${target_env}"
+cargo build --release --target $TARGET
+cat src/small_lex.csv src/core_lex.csv src/notcore_lex.csv > all.csv
+./target/$TARGET/release/dict-to-mozc -i ../id.def -f all.csv -s > ./sudachi.txt
+awk -f dup.awk ./sudachi.txt > ../sudachi.txt
+rm ./sudachi.txt
+./target/$TARGET/release/dict-to-mozc -i ../id.def -f all.csv -s -U ../user_dic_id.def > ./user_dic-ut-sudachidict.txt
+awk -f dup.awk ./user_dic-ut-sudachidict.txt > ../user_dic-ut-sudachidict.txt
+
+TARGET="${target_arch}-${target_vendor}-${target_os}-${target_env}"
+cargo build --release --target $TARGET
+cat src/small_lex.csv src/core_lex.csv src/notcore_lex.csv > all.csv
+./target/$TARGET/release/dict-to-mozc -i ../id.def -f all.csv -s > ./sudachi.txt
+awk -f dup.awk ./sudachi.txt > ../sudachi.txt
+rm ./sudachi.txt
+./target/$TARGET/release/dict-to-mozc -i ../id.def -f all.csv -s -U ../user_dic_id.def > ./user_dic-ut-sudachidict.txt
+awk -f dup.awk ./user_dic-ut-sudachidict.txt > ../user_dic-ut-sudachidict.txt
+
