@@ -28,6 +28,7 @@ fn id_expr(clsexpr: &String, id_def: &mut HashMap::<String, i32>, class_map: &mu
       r = *h.1;
     }
   };
+  if r == -1 { r = 1847 };
   if ! id_def.contains_key(clsexpr) {
       id_def.insert(clsexpr.to_string(), r);
   };
@@ -89,7 +90,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
       .delimiter(b","[0])
       .from_path(path);
   //let mut list = Vec::new();
-  let kana_check = Regex::new(r"[ァ-ヴ]").unwrap();
+  let kana_check = Regex::new(r"[ァ-ヺ]").unwrap();
   //let chimei_check = Regex::new(r"地名").unwrap();
   let kigou_check = Regex::new(r"^[a-zA-Z ]+$").unwrap();
   for result in reader?.records() {
@@ -116,8 +117,8 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
                 let c: char = std::char::from_u32(num).unwrap();
                 c.to_string()
             });
-            let s3 = &data[5];//.replace("補助記号", "記号"); //.replace("空白","記号");
-            let s4 = &data[6];//.replace("普通名詞", "名詞");
+            let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
+            let s4 = &data[6]; //.replace("普通名詞", "名詞");
             let s5 = &data[10].replace("形-", "形,");
             let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
             //let mut hinshi = Some(id_def.get(&Some(&class_map.get(&d))));
@@ -127,6 +128,9 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
                 hinshi_id = id_expr(&d, &mut *id_def, &mut class_map);
             } else {
                 hinshi_id = *hinshi.unwrap();
+            }
+            if hinshi_id == -1 {
+                println!("hinshi_id==-1:{}", _yomi);
             }
             class_map.insert(d.clone(), hinshi_id);
             let mut cost = data[3].parse::<i32>().unwrap();
