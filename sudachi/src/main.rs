@@ -175,12 +175,12 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
     let mut _yomi: String = (&data[4]).to_string();
     _yomi = _yomi.replace("ゐ", "い");
     _yomi = _yomi.replace("ゑ", "え");
-    let s1 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &_yomi, |_, num: &str| {
+    let s1 = regex_replace_all!(r#"\\u([0-9]{4})"#, &_yomi, |_, num: &str| {
         let num: u32 = u32::from_str_radix(num, 16).unwrap();
         let c: char = std::char::from_u32(num).unwrap();
         c.to_string()
     });
-    let s2 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &data[4], |_, num: &str| {
+    let s2 = regex_replace_all!(r#"\\u([0-9]{4})"#, &data[4], |_, num: &str| {
         let num: u32 = u32::from_str_radix(num, 16).unwrap();
         let c: char = std::char::from_u32(num).unwrap();
         c.to_string()
