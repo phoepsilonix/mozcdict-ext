@@ -37,7 +37,7 @@ fn id_expr(clsexpr: &String, id_def: &mut HashMap::<String, i32>, class_map: &mu
 }
 
 fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
-  let mut _hash = HashMap::<String, i32>::new();
+  let mut hash = HashMap::<String, i32>::new();
   let mut reader = csv::ReaderBuilder::new()
       .has_headers(false)
       .delimiter(b" "[0])
@@ -63,13 +63,13 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
         expr = re.replace(&expr, s1).to_string();
     };
     expr = expr.replace("形-","形,");
-    _hash.insert(expr.to_string(), id);
+    hash.insert(expr.to_string(), id);
   }
-  Ok(_hash)
+  Ok(hash)
 }
-/*
-fn read_user_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
-  let mut _hash = HashMap::<String, i32>::new();
+
+fn read_user_id_def(path: &Path) -> Result<HashMap::<i32, String>, csv::Error> {
+  let mut hash = HashMap::<i32, String>::new();
   let mut reader = csv::ReaderBuilder::new()
       .has_headers(false)
       .delimiter(b" "[0])
@@ -77,13 +77,13 @@ fn read_user_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
   for result in reader.records() {
     let data = result?;
     let id = data[0].parse::<i32>().unwrap();
-    let mut hinshi = &data[1];
-    _hash.insert(hinshi.to_string(), id);
+    let hinshi = &data[1];
+    hash.insert(id, hinshi.to_string());
   }
-  Ok(_hash)
+  Ok(hash)
 }
-*/
-fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
+
+fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>, user_id_def: & HashMap::<i32, String>, user_dict_flag: bool) -> Result<(), csv::Error> {
   let mut class_map = HashMap::<String, i32>::new();
   let reader = csv::ReaderBuilder::new()
       .has_headers(false)
@@ -121,7 +121,6 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
             let s4 = &data[6]; //.replace("普通名詞", "名詞");
             let s5 = &data[10].replace("形-", "形,");
             let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
-            //let mut hinshi = Some(id_def.get(&Some(&class_map.get(&d))));
             let hinshi = class_map.get(&d);
             let hinshi_id;
             if hinshi == None {
@@ -129,10 +128,6 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
             } else {
                 hinshi_id = *hinshi.unwrap();
             }
-            if hinshi_id == -1 {
-                println!("hinshi_id==-1:{}", _yomi);
-            }
-            class_map.insert(d.clone(), hinshi_id);
             let mut cost = data[3].parse::<i32>().unwrap();
             if cost < 0 {
                 cost = 8000;
@@ -142,15 +137,24 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
                 cost = 6000 + (cost / 10);
             }
             //let class: String = format!("{},{},{},{},{},{},{},{},{}", s1, s2, s3, hinshi_id, &data[6], &data[7], &data[8], &data[9], s4);
-            println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+            if user_dict_flag {
+                let hinshi = u_search_key(&user_id_def, hinshi_id);
+                if hinshi == "" {
+                    println!("{}\t{}\t{}\t{}", s1, s2, hinshi, hinshi_id);
+                } else {
+                    println!("{}\t{}\t{}\t{}", s1, s2, hinshi, "");
+                }
+            } else {
+                println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+            }
         }
     }
   }
   Ok(())
 }
 
-fn search(id_def: &HashMap::<String, i32>, search: i32) -> String {
-    for (key, value) in id_def {
+fn search_key(def: &HashMap::<String, i32>, search: i32) -> String {
+    for (key, value) in def {
         if value == &search {
             return key.to_string();
         } else {
@@ -160,7 +164,18 @@ fn search(id_def: &HashMap::<String, i32>, search: i32) -> String {
     return "".to_string();
 }
 
-fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(), csv::Error> {
+fn u_search_key(def: &HashMap::<i32, String>, search: i32) -> String {
+    for (key, value) in def {
+        if key == &search {
+            return value.to_string();
+        } else {
+            continue;
+        }
+    }
+    return "".to_string();
+}
+
+fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>, user_id_def: & HashMap::<i32, String>, user_dict_flag: bool) -> Result<(), csv::Error> {
   let reader = csv::ReaderBuilder::new()
       .has_headers(false)
       .delimiter(b"\t"[0])
@@ -175,7 +190,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
     let data = record;
     if ! kana_check.is_match(&data[0]) { continue };
     let hinshi_id = data[1].parse::<i32>().unwrap();
-    if kigou_check.is_match(&data[0]) && ! search(id_def, hinshi_id).contains("固有名詞") { continue };
+    if kigou_check.is_match(&data[0]) && ! search_key(&id_def, hinshi_id).contains("固有名詞") { continue };
     let mut _yomi: String = (&data[0]).to_string();
     _yomi = _yomi.replace("ゐ", "い");
     _yomi = _yomi.replace("ゑ", "え");
@@ -198,7 +213,12 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
         cost = 6000 + (cost / 10);
     }
     //let class: String = format!("{},{},{},{},{},{},{},{},{}", s1, s2, s3, hinshi_id, &data[6], &data[7], &data[8], &data[9], s4);
-    println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+    if user_dict_flag {
+        let hinshi = u_search_key(&user_id_def, hinshi_id);
+        println!("{}\t{}\t{}\t{}", s1, s2, hinshi, "");
+    } else {
+        println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+    }
         }
     }
   }
@@ -233,7 +253,7 @@ fn main() -> Result<(), csv::Error> {
     
     let mut csv_path: &Path = Path::new("./all.csv");
     let mut id_def_path: &Path = Path::new("../id.def");
-//    let mut user_id_def_path: &Path = Path::new("../user_dic_id.def");
+    let mut user_id_def_path: &Path = Path::new("../user_dic_id.def");
     let _p1: String;
     let _p2: String;
     let _p3: String;
@@ -251,14 +271,25 @@ fn main() -> Result<(), csv::Error> {
     }
     if matches.opt_present("user_id_def") {
         _p3 = matches.opt_str("user_id_def").unwrap_or("../user_dic_id.def".to_string());
-//        user_id_def_path = Path::new(&p3);
+        user_id_def_path = Path::new(&_p3);
     }
-    if matches.opt_present("sudachi") {
+    let user_dict_flag = matches.opt_present("user_id_def");
+    if matches.opt_present("sudachi") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
-      sudachi_read_csv(&csv_path, &mut id_def)?;
-    } else if matches.opt_present("utdict") {
+      let user_id_def = HashMap::<i32, String>::new();
+      sudachi_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
+    } else if matches.opt_present("utdict") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
-      utdict_read_csv(&csv_path, &mut id_def)?;
+      let user_id_def = HashMap::<i32, String>::new();
+      utdict_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
+    } else if matches.opt_present("sudachi") && user_dict_flag {
+      let mut id_def = read_id_def(&id_def_path)?;
+      let user_id_def = read_user_id_def(&user_id_def_path)?;
+      sudachi_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
+    } else if matches.opt_present("utdict") && user_dict_flag {
+      let mut id_def = read_id_def(&id_def_path)?;
+      let user_id_def = read_user_id_def(&user_id_def_path)?;
+      utdict_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
     }
     Ok(())
 }
