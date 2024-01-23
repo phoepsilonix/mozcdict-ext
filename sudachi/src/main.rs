@@ -48,7 +48,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
     hinshi.pop();
     let mut expr =  hinshi.join(",");
     expr = expr.replace("五段・", "五段-");
-    expr = expr.replace("名詞,一般", "名詞,普通名詞");
+    //expr = expr.replace("名詞,一般", "名詞,普通名詞");
     let mut re = Regex::new(r"五段-カ行[^,]*").unwrap();
     expr = re.replace(&expr, "五段-カ行").to_string();
     re = Regex::new(r"ラ行([^,]*)").unwrap();
@@ -116,7 +116,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
                 let c: char = std::char::from_u32(num).unwrap();
                 c.to_string()
             });
-            let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
+            let s3 = &data[5];//.replace("補助記号", "記号"); //.replace("空白","記号");
             let s4 = &data[6];//.replace("普通名詞", "名詞");
             let s5 = &data[10].replace("形-", "形,");
             let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
