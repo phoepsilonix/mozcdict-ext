@@ -81,48 +81,49 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<
     match result {
         Err(_err) => continue,
         Ok(record) => {
-    let data = record;
-    if &data[11] == "キゴウ" && ( &data[5] == "記号" || &data[5] == "補助記号") { continue };
-    if kigou_check.is_match(&data[4]) && &data[6] == "固有名詞" { continue };
-    if ! kana_check.is_match(&data[11]) { continue };
-    if chimei_check.is_match(&data[7]) { continue };
-    let target = &data[11].to_string().chars().collect::<Vec<char>>();
-    let mut _yomi: String = UCSStr::convert(target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
-    _yomi = _yomi.replace("ゐ", "い");
-    _yomi = _yomi.replace("ゑ", "え");
-    let s1 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &_yomi, |_, num: &str| {
-        let num: u32 = u32::from_str_radix(num, 16).unwrap();
-        let c: char = std::char::from_u32(num).unwrap();
-        c.to_string()
-    });
-    let s2 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &data[4], |_, num: &str| {
-        let num: u32 = u32::from_str_radix(num, 16).unwrap();
-        let c: char = std::char::from_u32(num).unwrap();
-        c.to_string()
-    });
-    let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
-    let s4 = &data[6];//.replace("普通名詞", "名詞");
-    let s5 = &data[10].replace("形-", "形,");
-    let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
-    //let mut hinshi = Some(id_def.get(&Some(&class_map.get(&d))));
-    let hinshi = class_map.get(&d);
-    let hinshi_id;
-    if hinshi == None {
-        hinshi_id = id_expr(&d, &mut *id_def, &mut class_map);
-    } else {
-        hinshi_id = *hinshi.unwrap();
-    }
-    class_map.insert(d.clone(), hinshi_id);
-    let mut cost = data[3].parse::<i32>().unwrap();
-    if cost < 0 {
-        cost = 8000;
-    } else if cost > 10000 {
-        cost = 10000;
-    } else {
-        cost = 6000 + (cost / 10);
-    }
-    //let class: String = format!("{},{},{},{},{},{},{},{},{}", s1, s2, s3, hinshi_id, &data[6], &data[7], &data[8], &data[9], s4);
-    println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
+            let data = record;
+            if &data[11] == "キゴウ" && ( &data[5] == "記号" || &data[5] == "補助記号") { continue };
+            if &data[5] == "空白" { continue };
+            if kigou_check.is_match(&data[4]) && &data[6] == "固有名詞" { continue };
+            if ! kana_check.is_match(&data[11]) { continue };
+            if chimei_check.is_match(&data[7]) { continue };
+            let target = &data[11].to_string().chars().collect::<Vec<char>>();
+            let mut _yomi: String = UCSStr::convert(target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
+            _yomi = _yomi.replace("ゐ", "い");
+            _yomi = _yomi.replace("ゑ", "え");
+            let s1 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &_yomi, |_, num: &str| {
+                let num: u32 = u32::from_str_radix(num, 16).unwrap();
+                let c: char = std::char::from_u32(num).unwrap();
+                c.to_string()
+            });
+            let s2 = regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, &data[4], |_, num: &str| {
+                let num: u32 = u32::from_str_radix(num, 16).unwrap();
+                let c: char = std::char::from_u32(num).unwrap();
+                c.to_string()
+            });
+            let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
+            let s4 = &data[6];//.replace("普通名詞", "名詞");
+            let s5 = &data[10].replace("形-", "形,");
+            let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
+            //let mut hinshi = Some(id_def.get(&Some(&class_map.get(&d))));
+            let hinshi = class_map.get(&d);
+            let hinshi_id;
+            if hinshi == None {
+                hinshi_id = id_expr(&d, &mut *id_def, &mut class_map);
+            } else {
+                hinshi_id = *hinshi.unwrap();
+            }
+            class_map.insert(d.clone(), hinshi_id);
+            let mut cost = data[3].parse::<i32>().unwrap();
+            if cost < 0 {
+                cost = 8000;
+            } else if cost > 10000 {
+                cost = 10000;
+            } else {
+                cost = 6000 + (cost / 10);
+            }
+            //let class: String = format!("{},{},{},{},{},{},{},{},{}", s1, s2, s3, hinshi_id, &data[6], &data[7], &data[8], &data[9], s4);
+            println!("{}\t{}\t{}\t{}\t{}", s1, hinshi_id, hinshi_id, cost, s2);
         }
     }
   }
