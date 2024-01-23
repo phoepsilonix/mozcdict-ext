@@ -48,7 +48,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
     hinshi.pop();
     let mut expr =  hinshi.join(",");
     expr = expr.replace("五段・", "五段-");
-    expr = expr.replace("名詞,一般", "名詞,普通名詞");
+    //expr = expr.replace("名詞,一般", "名詞,普通名詞");
     let mut re = Regex::new(r"五段-カ行[^,]*").unwrap();
     expr = re.replace(&expr, "五段-カ行").to_string();
     re = Regex::new(r"ラ行([^,]*)").unwrap();
