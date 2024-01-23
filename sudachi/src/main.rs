@@ -48,7 +48,7 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
     hinshi.pop();
     let mut expr =  hinshi.join(",");
     expr = expr.replace("五段・", "五段-");
-    //expr = expr.replace("名詞,一般", "名詞,普通名詞");
+    expr = expr.replace("名詞,一般", "名詞,普通名詞");
     let mut re = Regex::new(r"五段-カ行[^,]*").unwrap();
     expr = re.replace(&expr, "五段-カ行").to_string();
     re = Regex::new(r"ラ行([^,]*)").unwrap();
@@ -171,8 +171,8 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>) -> Result<(
     let data = record;
     if ! kana_check.is_match(&data[0]) { continue };
     let hinshi_id = data[1].parse::<i32>().unwrap();
-    if kigou_check.is_match(&data[4]) && ! search(id_def, hinshi_id).contains("固有名詞") { continue };
-    let mut _yomi: String = (&data[4]).to_string();
+    if kigou_check.is_match(&data[0]) && ! search(id_def, hinshi_id).contains("固有名詞") { continue };
+    let mut _yomi: String = (&data[0]).to_string();
     _yomi = _yomi.replace("ゐ", "い");
     _yomi = _yomi.replace("ゑ", "え");
     let s1 = regex_replace_all!(r#"\\u([0-9]{4})"#, &_yomi, |_, num: &str| {
@@ -229,25 +229,25 @@ fn main() -> Result<(), csv::Error> {
     
     let mut csv_path: &Path = Path::new("./all.csv");
     let mut id_def_path: &Path = Path::new("../id.def");
-    let mut user_id_def_path: &Path = Path::new("../user_dic_id.def");
-    let mut p1: String;
-    let mut p2: String;
-    let mut p3: String;
+//    let mut user_id_def_path: &Path = Path::new("../user_dic_id.def");
+    let _p1: String;
+    let _p2: String;
+    let _p3: String;
 
     if matches.opt_present("csv_file") {
         //csv_path = Path::new(&matches.opt_str("csv_file").unwrap_or("./all.csv".to_string()));
-        p1 = matches.opt_str("f").unwrap_or("./all.csv".to_string());
+        _p1 = matches.opt_str("f").unwrap_or("./all.csv".to_string());
         //p = String::from(&p);
-        csv_path = Path::new(&p1);
+        csv_path = Path::new(&_p1);
     }
     if matches.opt_present("id_def") {
-        p2 = matches.opt_str("id_def").unwrap_or("../id.def".to_string());
+        _p2 = matches.opt_str("id_def").unwrap_or("../id.def".to_string());
         //p = String::from(&p);
-        id_def_path = Path::new(&p2);
+        id_def_path = Path::new(&_p2);
     }
     if matches.opt_present("user_id_def") {
-        p3 = matches.opt_str("user_id_def").unwrap_or("../user_dic_id.def".to_string());
-        user_id_def_path = Path::new(&p3);
+        _p3 = matches.opt_str("user_id_def").unwrap_or("../user_dic_id.def".to_string());
+//        user_id_def_path = Path::new(&p3);
     }
     if matches.opt_present("sudachi") {
       let mut id_def = read_id_def(&id_def_path)?;
