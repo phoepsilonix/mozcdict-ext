@@ -181,7 +181,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>, user_id_def
       .delimiter(b"\t"[0])
       .from_path(path);
   //let mut list = Vec::new();
-  let kana_check = Regex::new(r"[ぁ-んゔ]").unwrap();
+  let kana_check = Regex::new(r"[ぁ-ゖ]").unwrap();
   let kigou_check = Regex::new(r"^[a-zA-Z ]+$").unwrap();
   for result in reader?.records() {
     match result {
