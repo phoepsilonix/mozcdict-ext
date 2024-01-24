@@ -140,7 +140,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>, user_id_de
             if user_dict_flag {
                 let hinshi = u_search_key(&user_id_def, hinshi_id);
                 if hinshi == "" {
-                    println!("{}\t{}\t{}\t{}", s1, s2, hinshi, hinshi_id);
+                    dbg!(format!("{}\t{}\t{}\t{}", s1, s2, hinshi, hinshi_id));
                 } else {
                     println!("{}\t{}\t{}\t{}", s1, s2, hinshi, "");
                 }
