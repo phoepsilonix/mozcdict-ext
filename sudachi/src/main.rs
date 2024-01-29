@@ -29,7 +29,7 @@ fn id_expr(clsexpr: &String, id_def: &mut HashMap::<String, i32>, class_map: &mu
       if *x == "*" { continue };
       let i = h.0.split(",").collect::<Vec<_>>();
       for y in i {
-        if y == "*" || y == "自立" || y == "非自立"  || y == "一般"  { continue };
+        if y == "*"  || y == "自立" || y == "一般" /* || y == "非自立" */ { continue };
         if *x == y {
             p = p + 1;
             continue;
@@ -41,11 +41,11 @@ fn id_expr(clsexpr: &String, id_def: &mut HashMap::<String, i32>, class_map: &mu
         r = *h.1;
     }
   };
-  if r == -1 { r = 1847 };
-  if ! id_def.contains_key(clsexpr) {
-    id_def.insert(clsexpr.to_string(), r);
-  };
   }
+  if r == -1 { r = 1847 };
+  //if ! id_def.contains_key(clsexpr) {
+  id_def.insert(clsexpr.to_string(), r);
+  //};
   class_map.insert(clsexpr.to_string(), r);
   return r;
 }
@@ -63,7 +63,9 @@ fn read_id_def(path: &Path) -> Result<HashMap::<String, i32>, csv::Error> {
     hinshi.pop();
     let mut expr =  hinshi.join(",");
     expr = expr.replace("五段・", "五段-");
-    expr = expr.replace(r"^名詞,一般", "名詞,普通名詞");
+    let re = Regex::new(r"^名詞,一般").unwrap();
+    expr = re.replace(&expr, "名詞,普通名詞").to_string();
+    expr = expr.replace("名詞,数,", "名詞,数詞,");
     let mut re = Regex::new(r"五段-カ行[^,]*").unwrap();
     expr = re.replace(&expr, "五段-カ行").to_string();
     re = Regex::new(r"ラ行([^,]*)").unwrap();
@@ -132,7 +134,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut HashMap::<String, i32>, user_id_de
                 c.to_string()
             });
             let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
-            let s4 = &data[6]; //.replace("普通名詞", "名詞");
+            let s4 = &data[6].replace(r"^数詞$", "数").replace("非自立可能","非自立");
             let s5 = &data[10].replace("形-", "形,");
             let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
             let hinshi = class_map.get(&d);
@@ -367,6 +369,7 @@ fn main() -> Result<(), csv::Error> {
     if matches.opt_present("sudachi") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
       let user_id_def = HashMap::<i32, String>::new();
+      dbg!(id_def.clone());
       sudachi_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
     } else if matches.opt_present("utdict") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
