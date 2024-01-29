@@ -369,7 +369,6 @@ fn main() -> Result<(), csv::Error> {
     if matches.opt_present("sudachi") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
       let user_id_def = HashMap::<i32, String>::new();
-      dbg!(id_def.clone());
       sudachi_read_csv(&csv_path, &mut id_def, &user_id_def, user_dict_flag)?;
     } else if matches.opt_present("utdict") && ! user_dict_flag {
       let mut id_def = read_id_def(&id_def_path)?;
