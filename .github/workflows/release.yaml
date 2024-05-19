@@ -1,61 +1,80 @@
 name: Release
 
 on:
-  create:
+  push:
     tags:
       - 'v*'
 
 jobs:
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-      env:
-        SCCACHE_GHA_ENABLED: "true"
-        RUSTC_WRAPPER: "sccache"
-        # SCCACHE_RECACHE: 1 # Uncomment this to clear 
+  build:
+    name: Release binary
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: dict-to-mozc-x86_64-linux.tar.xz
+            asset_name: dict-to-mozc-x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            artifact_name: dict-to-mozc-aarch64-linux.tar.xz
+            asset_name: dict-to-mozc-aarch64-unknown-linux-musl
+
+
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - uses: actions/checkout@v4
-      - name: install build tools (Linux)
-        id: startup
-        run: |
-          sudo apt-get update
-          sudo apt-get upgrade -y
-          sudo apt-get install -y strip xz
-      - name: rust install
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
-          sh rustup-init.sh -y
-      - name: Mount rustup cache
-        uses: actions/cache@v4
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          path: "/home/runner/.rustup"
-          key: rustup-${{ runner.os }}-mozc-${{ steps.startup.outputs.container_name }}
-          restore-keys: rustup-${{ runner.os }}-mozc-${{ steps.startup.outputs.container_name }}
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+          toolchain: stable
+          override: true
+
+      - name: Cross build with all features
+        uses: actions-rs/cargo@v1
         with:
-          version: "v0.8.0"
-      - name: Install mold linker
-        uses: rui314/setup-mold@staging
-        with:
-          mold-version: 2.31.0
-          make-default: true
-      - name: added dictionary
+          working-directory: sudachi
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }} --all-features --verbose --manifest-path sudachi/Cargo.toml
+
+      - name: Get the release version from the tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build archive
+        shell: bash
         run: |
           cd sudachi
-          . "$HOME/.cargo/env"
-          rustup update stable
-          rustup target list --installed | grep $(rustc -vV | sed -e 's|host: ||' -e 's|-gnu||p' -n) | grep musl && TARGET=$(rustup target list --installed | grep $(rustc -vV | sed -e 's|host: ||' -e 's|-gnu||p' -n)|grep musl|head -n1) || TARGET=$(rustup target list --installed | grep $(rustc -vV | sed -e 's|host: ||' -e 's|-gnu||p' -n)|grep -v musl|head -n1)
-          cargo build --release --target $TARGET
-          cp target/$TARGET/release/dict-to-mozc dict-to-mozc
-          strip --strip-all dict-to-mozc
-          tar -cf dict-to-mozc.tar ./dict-to-mozc
-          xz -9 -e dict-to-mozc.tar
-          mkdir -p ../release
-          mv dict-to-mozc.tar.xz ../release/
-      - name: Create release
-        uses: ncipollo/release-action@v1
+          # Replace with the name of your binary
+          binary_name="dict-to-mozc"
+
+          dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            strip --strip-all "target/${{ matrix.target }}/release/$binary_name.exe"
+            mv "target/${{ matrix.target }}/release/$binary_name.exe" "$dirname"
+          else
+            strip --strip-all "target/${{ matrix.target }}/release/$binary_name"
+            mv "target/${{ matrix.target }}/release/$binary_name" "$dirname"
+          fi
+
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            7z a ../"$dirname.zip" "$dirname"
+            7z l ../"$dirname.zip"
+            echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+            tar -czf ../"$dirname.tar.gz" "$dirname"
+            tar tvf ../"$dirname.tar.gz"
+            echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Upload binaries to release
+        uses: softprops/action-gh-release@v1
         with:
-          artifacts: 'release/*'
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            ${{ env.ASSET }}
 
