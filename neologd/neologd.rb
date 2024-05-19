@@ -18,18 +18,18 @@ CLASS_MAP = {}
 ID_DEF = {}
 ALREADY = {}
 
-$opts = { threads: 18, slice: 8000,
+$opts = { threads: 18, Slice: 8000,
           filename: [ ],
           idfile: "../../mozc/src/data/dictionary_oss/id.def"
 }
 op = OptionParser.new
-op.on("-E", "--English")
-op.on("-S", "--Symbol")
+op.on("-e", "--english")
+op.on("-s", "--symbol")
 op.on('-tNUM', '--threads=NUM', Integer ) { |v| $opts[:threads] = v }
-op.on('-sNUM', '--slice=NUM', Integer ) { |v| $opts[:slice] = v }
+op.on('-SNUM', '--Slice=NUM', Integer ) { |v| $opts[:Slice] = v }
 op.on('-fVAL', '--filename=VAL', String ) { |v| $opts[:filename] |= [ v ]}
 op.on('-iVAL', '--idfile=VAL', String ){ |v| $opts[:idfile] = v }
-op.on('-eVAL', '--encoding=VAL', String ) { |v| 
+op.on('-EVAL', '--Encoding=VAL', String ) { |v| 
   $opts[:fileencoding] = v
   $opts[:need_convert] = true
 }
@@ -90,7 +90,7 @@ end
 
 # parallel
 THREAD_NUM=$opts[:threads]
-SLICE_NUM=$opts[:slice]
+SLICE_NUM=$opts[:Slice]
 
 # baseball heroes,4785,4785,5000,BASEBALL HEROES,名詞,固有名詞,一般,*,*,*,ベースボールヒーローズ,BASEBALL HEROES,*,A,*,*,*,*
 # 見出し (TRIE 用),左連接ID,右連接ID,コスト,見出し (解析結果表示用), 品詞1,品詞2,品詞3,品詞4,品詞 (活用型),品詞 (活用形), 読み,正規化表記,辞書形ID,分割タイプ,A単位分割情報,B単位分割情報,※未使用
@@ -167,10 +167,10 @@ $opts[:filename].each do |source_file|
 
       # 英語への変換はオプションによる (デフォルトスキップ)
       # 固有名詞は受け入れる
-      next if (!$opts[:English] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
+      next if (!$opts[:english] && base =~ /^[a-zA-Z ]+$/ && !clsexpr.include?("固有名詞") )
 
       # 「きごう」で変換される記号は多すぎて支障をきたすため、除外する
-      next if (!$opts[:Symbol] && yomi == "きごう" && clsexpr.include?("記号"))
+      next if (!$opts[:symbol] && yomi == "きごう" && clsexpr.include?("記号"))
 
       generic_expr = [yomi, id, base].join(" ")
       if ALREADY[generic_expr]
