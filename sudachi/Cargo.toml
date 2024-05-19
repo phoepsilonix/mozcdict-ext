@@ -13,3 +13,6 @@ getopts = "0.2.21"
 kanaria = "0.2.0"
 lazy-regex = "3.1.0"
 regex = "1.10.3"
+
+[profile.release]
+strip = "symbols"
