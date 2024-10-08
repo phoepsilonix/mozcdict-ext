@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
 use std::env;
 use std::io;
 use std::io::Write;
@@ -16,11 +17,11 @@ use std::result::Result; // 標準ライブラリのResultを明示的にイン�
 struct DictionaryKey {
     yomi: String,
     surface: String,
+    hinshi_id: i32,
 }
 
 struct DictionaryEntry {
     key: DictionaryKey,
-    hinshi_id: i32,
     cost: i32,
     pos: String,
 }
@@ -52,7 +53,7 @@ impl DictionaryData {
                 writeln!(
                     writer,
                     "{}\t{}\t{}\t{}\t{}",
-                    entry.key.yomi, entry.hinshi_id, entry.hinshi_id, entry.cost, entry.key.surface
+                    entry.key.yomi, entry.key.hinshi_id, entry.key.hinshi_id, entry.cost, entry.key.surface
                 )?;
             }
         } else {
@@ -111,7 +112,7 @@ use crate::utils::convert_to_hiragana;
 use crate::utils::unicode_escape_to_char;
 use crate::utils::adjust_cost;
 
-fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut HashMap<String, i32>) -> i32 {
+fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut HashMap<String, i32>, default_noun_id: i32) -> i32 {
     if let Some(&r) = id_def.get(clsexpr) {
         class_map.insert(clsexpr.to_string(), r);
         return r;
@@ -132,7 +133,7 @@ fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut Has
 
                 // 残りの項目をチェック
                 for (i, (a, b)) in expr.iter().zip(key_parts.iter()).skip(2).enumerate() {
-                    if *b == "*" || *a == *b {
+                    if *b != "*" && *a == *b {
                         match_count += 1;
                     } else if i < 1 { // 3番目の項目（小分類）まで厳密にチェック
                         is_valid_match = false;
@@ -148,7 +149,7 @@ fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut Has
 
                 // 特殊なケースの処理
                 if expr[0] == "名詞" && expr[1] == "固有名詞" {
-                    if match_count < 4 { // 固有名詞の場合、より詳細なマッチングを要求
+                    if match_count < 3 { // 固有名詞の場合、より詳細なマッチングを要求
                         is_valid_match = false;
                     }
                 } else if expr[0] == "動詞" {
@@ -169,18 +170,19 @@ fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut Has
             }
     }
 
-    let result_id = if best_match.1 == -1 { 1847 } else { best_match.1 };
+    let result_id = if best_match.1 == -1 { default_noun_id } else { best_match.1 };
     id_def.insert(clsexpr.to_string(), result_id);
     class_map.insert(clsexpr.to_string(), result_id);
     result_id
 }
 
-fn read_id_def(path: &Path) -> Result<IdDef, CsvError> {
+fn read_id_def(path: &Path) -> Result<(IdDef, i32), CsvError> {
     let mut hash = IdDef::new();
     let mut reader = ReaderBuilder::new()
         .has_headers(false)
         .delimiter(b' ')
         .from_path(path)?;
+    let mut default_noun_id: i32 = -1;
 
     for result in reader.records() {
         let record = result?;
@@ -189,6 +191,11 @@ fn read_id_def(path: &Path) -> Result<IdDef, CsvError> {
             .replace("名詞,数,", "名詞,数詞,")
             .replace("形-","形,")
             .replace("地域,","地名,");
+
+        // 名詞、一般名詞のIDを保存
+        if expr == "名詞,普通名詞,*,*,*,*,*" || expr == "名詞,一般,*,*,*,*,*" {
+            default_noun_id = id;
+        }
 
         let mut re = Regex::new(r"五段・カ行[^,]*").unwrap();
         expr = re.replace(&expr, "五段・カ行").to_string();
@@ -217,7 +224,7 @@ fn read_id_def(path: &Path) -> Result<IdDef, CsvError> {
 
         hash.insert(expr, id);
     }
-    Ok(hash)
+    Ok((hash, default_noun_id))
 }
 
 struct PosMapping {
@@ -269,7 +276,7 @@ fn get_user_pos_by_id(mapping: &mut PosMapping, id_def: &IdDef, hinshi_id: i32) 
 
                 // 全項目のマッチングを試みる
                 for (i, (a, b)) in parts.iter().zip(key_parts.iter()).enumerate() {
-                    if *b == "*" || *a == *b {
+                    if *b != "*" && *a == *b {
                         match_count += 1;
                     } else if i < 2 { // 最初の2項目（品詞大分類、中分類）は必ずマッチする必要がある
                         is_valid_match = false;
@@ -284,7 +291,7 @@ fn get_user_pos_by_id(mapping: &mut PosMapping, id_def: &IdDef, hinshi_id: i32) 
                 }
 
                 // 固有名詞の場合、より詳細なマッチングを要求
-                if parts[0] == "名詞" && parts[1] == "固有名詞" && match_count < 3 {
+                if parts[0] == "名詞" && parts[1] == "固有名詞" && match_count < 4 {
                     is_valid_match = false;
                 }
 
@@ -319,53 +326,56 @@ fn create_pos_mapping() -> PosMapping {
     let mut mapping = PosMapping::new();
 
     // ユーザー辞書の品詞とid.defの品詞のマッピングを追加
-    mapping.add_mapping("BOS/EOS", "BOS/EOS,*,*,*,*,*,*");
-    mapping.add_mapping("その他", "その他,*,*,*,*,*,*");
-    mapping.add_mapping("フィラー", "感動詞,フィラー,*,*,*,*,*");
-    mapping.add_mapping("感動詞", "感動詞,*,*,*,*,*,*");
-    mapping.add_mapping("記号", "記号,*,*,*,*,*,*");
-    mapping.add_mapping("形容詞", "形容詞,*,*,*,*,*,*");
-    mapping.add_mapping("固有名詞", "名詞,固有名詞,*,*,*,*,*");
-    mapping.add_mapping("終助詞", "助詞,終助詞,*,*,*,*,*");
-    mapping.add_mapping("助詞", "助詞,*,*,*,*,*,*");
-    mapping.add_mapping("助数詞", "名詞,数詞,*,*,*,*,*");
-    mapping.add_mapping("助動詞", "助動詞,*,*,*,*,*,*");
-    mapping.add_mapping("人名", "名詞,固有名詞,人名,*,*,*,*");
-    mapping.add_mapping("数", "名詞,数詞,*,*,*,*,*");
-    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
-    mapping.add_mapping("接続詞", "接続詞,*,*,*,*,*,*");
-    mapping.add_mapping("接頭語", "接頭辞,*,*,*,*,*,*");
-    mapping.add_mapping("接尾一般", "接尾辞,*,*,*,*,*,*");
-    mapping.add_mapping("接尾人名", "接尾辞,人名,*,*,*,*,*");
-    mapping.add_mapping("接尾地名", "接尾辞,地名,*,*,*,*,*");
+    mapping.add_mapping("固有名詞", "名詞,固有名詞,一般,*,*,*,*");
     mapping.add_mapping("組織", "名詞,固有名詞,組織,*,*,*,*");
     mapping.add_mapping("地名", "名詞,固有名詞,地名,*,*,*,*");
-    mapping.add_mapping("動詞", "動詞,*,*,*,*,*,*");
+    mapping.add_mapping("地名", "名詞,固有名詞,国,*,*,*,*");
+    mapping.add_mapping("地名", "名詞,接尾,地域,*,*,*,*");
+    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
+    mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
+    mapping.add_mapping("人名", "名詞,固有名詞,人名,*,*,*,*");
+    mapping.add_mapping("接尾人名", "接尾辞,人名,*,*,*,*,*");
+    mapping.add_mapping("接尾地名", "接尾辞,地名,*,*,*,*,*");
     mapping.add_mapping("動詞カ行五段", "動詞,一般,*,*,五段・カ行,*,*");
     mapping.add_mapping("動詞カ変", "動詞,一般,*,*,カ変,*,*");
     mapping.add_mapping("動詞サ行五段", "動詞,一般,*,*,五段・サ行,*,*");
-    mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
     mapping.add_mapping("動詞ハ行四", "動詞,非自立,*,*,四段・ハ行,*,*");
     mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段・マ行,*,*");
     mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段・ラ行,*,*");
-    mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
     mapping.add_mapping("動詞ワ行五段", "動詞,自立,*,*,五段・ワ行,*,*");
-    mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
-    mapping.add_mapping("副詞", "副詞,*,*,*,*,*,*");
-    mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
-    mapping.add_mapping("名詞", "名詞,普通名詞,*,*,*,*,*");
     mapping.add_mapping("名詞サ変", "名詞,普通名詞,サ変可能,*,*,*,*");
-    mapping.add_mapping("名詞形動", "形状詞,*,*,*,*,*,*");
-    mapping.add_mapping("連体詞", "連体詞,*,*,*,*,*,*");
+    mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
+    mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
+    mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
 
-    mapping.add_mapping("記号", "補助記号,*,*,*,*,*,*");
     mapping.add_mapping("動詞五段", "動詞,一般,*,*,五段,*,*");
     mapping.add_mapping("形容詞", "形容詞,一般,*,*,形容詞,*,*");
+    mapping.add_mapping("フィラー", "感動詞,フィラー,*,*,*,*,*");
+    mapping.add_mapping("BOS/EOS", "BOS/EOS,*,*,*,*,*,*");
+    mapping.add_mapping("その他", "その他,*,*,*,*,*,*");
+    mapping.add_mapping("感動詞", "感動詞,*,*,*,*,*,*");
+    mapping.add_mapping("助詞", "助詞,*,*,*,*,*,*");
+    mapping.add_mapping("助動詞", "助動詞,*,*,*,*,*,*");
+    mapping.add_mapping("終助詞", "助詞,終助詞,*,*,*,*,*");
+    mapping.add_mapping("名詞", "名詞,普通名詞,*,*,*,*,*");
+    mapping.add_mapping("固有名詞", "名詞,固有名詞,*,*,*,*,*");
+    mapping.add_mapping("数", "名詞,数詞,*,*,*,*,*");
+    mapping.add_mapping("助数詞", "名詞,数詞,*,*,*,*,*");
+    mapping.add_mapping("接尾一般", "接尾辞,*,*,*,*,*,*");
+    mapping.add_mapping("接続詞", "接続詞,*,*,*,*,*,*");
+    mapping.add_mapping("接頭語", "接頭辞,*,*,*,*,*,*");
+    mapping.add_mapping("副詞", "副詞,*,*,*,*,*,*");
+    mapping.add_mapping("形容詞", "形容詞,*,*,*,*,*,*");
+    mapping.add_mapping("記号", "補助記号,*,*,*,*,*,*");
+    mapping.add_mapping("名詞形動", "形状詞,*,*,*,*,*,*");
+    mapping.add_mapping("連体詞", "連体詞,*,*,*,*,*,*");
+    mapping.add_mapping("動詞", "動詞,*,*,*,*,*,*");
+    mapping.add_mapping("記号", "記号,*,*,*,*,*,*");
 
     mapping
 }
 
-fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
+fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut class_map = HashMap::<String, i32>::new();
     let mut mapping = create_pos_mapping();
     let reader = csv::ReaderBuilder::new()
@@ -373,7 +383,8 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
         .delimiter(b","[0])
         .from_path(path);
     //let mut list = Vec::new();
-    let kana_check = Regex::new(r"[ぁ-ゖァ-ヺ]").unwrap();
+    let kana_check = Regex::new(r"^[ぁ-ゖァ-ヺ]+$").unwrap();
+    let eisuu_check = Regex::new(r"^[a-zA-Z0-9]+$").unwrap();
     //let chimei_check = Regex::new(r"地名").unwrap();
     let kigou_check = Regex::new(r"^[a-zA-Z ]+$").unwrap();
     for result in reader?.records() {
@@ -386,17 +397,19 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                 if ! symbol_flag && s3 == "空白" { continue };
                 if ! symbol_flag && kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
                 if ! kana_check.is_match(&data[11]) { continue };
-                if ! chimei_flag && data[7].contains("地名") { continue };
+                if data[7].contains("地名") {
+                    if ! eisuu_check.is_match(&data[0]) && ! chimei_flag { continue };
+                };
                 let mut _yomi: String = convert_to_hiragana(&data[11]);
                 let s1 = unicode_escape_to_char(&_yomi);
                 let s2 = unicode_escape_to_char(&data[4]);
-                let s4 = &data[6].replace(r"^数詞$", "数").replace("非自立可能","非自立");
+                let s4 = &data[6].replace("非自立可能","非自立"); //.replace(r"^数詞$", "数");
                 let s5 = &data[10].replace("形-", "形,");
                 let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
                 let hinshi = class_map.get(&d);
                 let hinshi_id;
                 if hinshi == None {
-                    hinshi_id = id_expr(&d, &mut *id_def, &mut class_map);
+                    hinshi_id = id_expr(&d, &mut *id_def, &mut class_map, default_noun_id);
                 } else {
                     hinshi_id = *hinshi.unwrap();
                 }
@@ -409,8 +422,8 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi,
                             }, true);
@@ -420,8 +433,8 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi_id.to_string(),
                             }, true);
@@ -432,8 +445,8 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                         key: DictionaryKey {
                             yomi: s1.to_string(),
                             surface: s2.to_string(),
+                            hinshi_id,
                         },
-                        hinshi_id,
                         cost,
                         pos: "".to_string(),
                     }, false);
@@ -490,8 +503,8 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi,
                             }, true);
@@ -501,8 +514,8 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi_id.to_string(),
                             }, true);
@@ -513,8 +526,8 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
                         key: DictionaryKey {
                             yomi: s1.to_string(),
                             surface: s2.to_string(),
+                            hinshi_id,
                         },
-                        hinshi_id,
                         cost,
                         pos: "".to_string(),
                     }, false);
@@ -525,7 +538,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
     Ok(())
 }
 
-fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
+fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let mut class_map = HashMap::<String, i32>::new();
     let reader = csv::ReaderBuilder::new()
@@ -562,7 +575,7 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                 let hinshi = class_map.get(&d);
                 let hinshi_id;
                 if hinshi == None {
-                    hinshi_id = id_expr(&d, &mut *id_def, &mut class_map);
+                    hinshi_id = id_expr(&d, &mut *id_def, &mut class_map, default_noun_id);
                 } else {
                     hinshi_id = *hinshi.unwrap();
                 }
@@ -575,8 +588,8 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi,
                             }, true);
@@ -586,8 +599,8 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                                 key: DictionaryKey {
                                     yomi: s1.to_string(),
                                     surface: s2.to_string(),
+                                    hinshi_id,
                                 },
-                                hinshi_id,
                                 cost,
                                 pos: hinshi_id.to_string(),
                             }, true);
@@ -598,8 +611,8 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                         key: DictionaryKey {
                             yomi: s1.to_string(),
                             surface: s2.to_string(),
+                            hinshi_id,
                         },
-                        hinshi_id,
                         cost,
                         pos: "".to_string(),
                     }, false);
@@ -640,41 +653,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut csv_path: &Path = Path::new("./all.csv");
-    let mut id_def_path: &Path = Path::new("../id.def");
-    let _p1: String;
-    let _p2: String;
+    let current_dir = env::current_dir()?;
+    let mut csv_path = current_dir.join("all.csv");
+    let mut id_def_path = current_dir.join("id.def");
 
-    if matches.opt_present("csv_file") {
-        _p1 = matches.opt_str("f").unwrap_or("./all.csv".to_string());
-        csv_path = Path::new(&_p1);
+    if let Some(csv_file) = matches.opt_str("csv_file") {
+        csv_path = PathBuf::from(csv_file);
     }
-    if matches.opt_present("id_def") {
-        _p2 = matches.opt_str("id_def").unwrap_or("../id.def".to_string());
-        id_def_path = Path::new(&_p2);
+
+    if let Some(id_def_file) = matches.opt_str("id_def") {
+        id_def_path = PathBuf::from(id_def_file);
     }
 
     let user_dict_flag = matches.opt_present("user_dict");
     let chimei_flag = matches.opt_present("places");
     let symbol_flag = matches.opt_present("Symbols");
+    let (mut id_def, default_noun_id) = read_id_def(&id_def_path)?;
     if matches.opt_present("sudachi") && ! user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
-        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("utdict") && ! user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
         utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("neologd") && ! user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
-        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("sudachi") && user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
-        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("utdict") && user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
         utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("neologd") && user_dict_flag {
-        let mut id_def = read_id_def(&id_def_path)?;
-        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
     }
     dict_data.output(user_dict_flag)?;
 
