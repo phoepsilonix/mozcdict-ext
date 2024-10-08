@@ -189,8 +189,10 @@ fn read_id_def(path: &Path) -> Result<IdDef, CsvError> {
             .replace("名詞,数,", "名詞,数詞,")
             .replace("形-","形,")
             .replace("地域,","地名,");
+
         let mut re = Regex::new(r"五段・カ行[^,]*").unwrap();
         expr = re.replace(&expr, "五段・カ行").to_string();
+
         re = Regex::new(r"ラ行([^,]*)").unwrap();
         let cap = match re.captures(&expr) {
             Some(i) => i.get(1).unwrap().as_str(),
@@ -201,6 +203,18 @@ fn read_id_def(path: &Path) -> Result<IdDef, CsvError> {
             s1.push_str(cap);
             expr = re.replace(&expr, s1).to_string();
         };
+
+        re = Regex::new(r"ワ行([^,]*)").unwrap();
+        let cap = match re.captures(&expr) {
+            Some(i) => i.get(1).unwrap().as_str(),
+            None => "",
+        };
+        if cap != "" {
+            let mut s1 = String::from("ワ行,");
+            s1.push_str(cap);
+            expr = re.replace(&expr, s1).to_string();
+        };
+
         hash.insert(expr, id);
     }
     Ok(hash)
@@ -327,11 +341,15 @@ fn create_pos_mapping() -> PosMapping {
     mapping.add_mapping("組織", "名詞,固有名詞,組織,*,*,*,*");
     mapping.add_mapping("地名", "名詞,固有名詞,地名,*,*,*,*");
     mapping.add_mapping("動詞", "動詞,*,*,*,*,*,*");
-    mapping.add_mapping("動詞カ行五段", "動詞,一般,*,*,五段-カ行,*,*");
-    mapping.add_mapping("動詞サ行五段", "動詞,一般,*,*,五段-サ行,*,*");
+    mapping.add_mapping("動詞カ行五段", "動詞,一般,*,*,五段・カ行,*,*");
+    mapping.add_mapping("動詞カ変", "動詞,一般,*,*,カ変,*,*");
+    mapping.add_mapping("動詞サ行五段", "動詞,一般,*,*,五段・サ行,*,*");
     mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
-    mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段-マ行,*,*");
-    mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段-ラ行,*,*");
+    mapping.add_mapping("動詞ハ行四", "動詞,非自立,*,*,四段・ハ行,*,*");
+    mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段・マ行,*,*");
+    mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段・ラ行,*,*");
+    mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
+    mapping.add_mapping("動詞ワ行五段", "動詞,自立,*,*,五段・ワ行,*,*");
     mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
     mapping.add_mapping("副詞", "副詞,*,*,*,*,*,*");
     mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
@@ -342,9 +360,6 @@ fn create_pos_mapping() -> PosMapping {
 
     mapping.add_mapping("記号", "補助記号,*,*,*,*,*,*");
     mapping.add_mapping("動詞五段", "動詞,一般,*,*,五段,*,*");
-    mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
-    mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
-    mapping.add_mapping("動詞カ変", "動詞,一般,*,*,カ変,*,*");
     mapping.add_mapping("形容詞", "形容詞,一般,*,*,形容詞,*,*");
 
     mapping
