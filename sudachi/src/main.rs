@@ -5,14 +5,15 @@ use std::env;
 use std::io;
 use std::io::Write;
 use regex::Regex;
-use kanaria::string::{UCSStr, ConvertType};
-use kanaria::utils::ConvertTarget;
 use lazy_regex::regex_replace_all;
 use csv::{ReaderBuilder, Error as CsvError};
+use encoding_rs::UTF_8;
+use unicode_normalization::UnicodeNormalization;
 
 use std::result::Result; // 標準ライブラリのResultを明示的にインポート
 
-// カスタムの結果構造体の名前を変更
+// 結果構造体
+// yomi,surface,hinshi_idの組み合わせで重複チェックされる。
 #[derive(Hash, Eq, PartialEq, Clone)]
 struct DictionaryKey {
     yomi: String,
@@ -20,12 +21,14 @@ struct DictionaryKey {
     hinshi_id: i32,
 }
 
+// コストと品詞判定で判明した品詞の文字列
 struct DictionaryEntry {
     key: DictionaryKey,
     cost: i32,
     pos: String,
 }
 
+// システム辞書型式とユーザー辞書型式
 struct DictionaryData {
     entries: HashMap<DictionaryKey, DictionaryEntry>,
     user_entries: HashMap<DictionaryKey, DictionaryEntry>,
@@ -72,7 +75,8 @@ impl DictionaryData {
         writer.flush()
     }
 }
-
+// Mozc ソースに含まれるsrc/data/dictionary_oss/id.def
+// 更新される可能性がある。
 type IdDef = HashMap<String, i32>;
 
 const DEFAULT_COST: i32 = 6000;
@@ -83,13 +87,28 @@ const COST_ADJUSTMENT: i32 = 10;
 mod utils {
     use super::*;
 
+
+    // カタカナから読みを平仮名へ
     pub fn convert_to_hiragana(text: &str) -> String {
-        let target: Vec<char> = text.chars().collect();
-        let mut yomi: String = UCSStr::convert(&target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
-        yomi = yomi.replace("ゐ", "い").replace("ゑ", "え");
-        yomi
+        let (cow, _, _) = UTF_8.encode(text);
+        let decoded = UTF_8.decode(&cow).0;
+        let normalized = decoded.nfkc().collect::<String>();
+        normalized
+            .chars()
+            .map(|c| match c {
+                'ァ'..='ヶ' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
+                'ヷ' => 'わ',
+                'ヸ' => 'ゐ',
+                'ヹ' => 'ゑ',
+                'ヺ' => 'を',
+                _ => c,
+            })
+        .collect::<String>()
+            .replace("ゐ", "い")
+            .replace("ゑ", "え")
     }
 
+    // Unicode Escapeの記述が含まれる場合、それを変換する。
     pub fn unicode_escape_to_char(text: &str) -> String {
         regex_replace_all!(r#"\\u([0-9a-fA-F]{4})"#, text, |_, num: &str| {
             let num: u32 = u32::from_str_radix(num, 16).unwrap();
@@ -97,6 +116,7 @@ mod utils {
         }).to_string()
     }
 
+    // コスト計算
     pub fn adjust_cost(cost: i32) -> i32 {
         if cost < MIN_COST {
             8000
@@ -112,6 +132,7 @@ use crate::utils::convert_to_hiragana;
 use crate::utils::unicode_escape_to_char;
 use crate::utils::adjust_cost;
 
+// 辞書データの品詞情報とid.defを比較して品詞のidを確定する。
 fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut HashMap<String, i32>, default_noun_id: i32) -> i32 {
     if let Some(&r) = id_def.get(clsexpr) {
         class_map.insert(clsexpr.to_string(), r);
@@ -157,9 +178,15 @@ fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut Has
                     let verb_type = expr.get(4).unwrap_or(&"");
                     if verb_type.contains("五段") && key_parts.iter().any(|&k| k.contains("五段")) {
                         match_count += 1;
+                    } else if verb_type.contains("四段") && key_parts.iter().any(|&k| k.contains("四段")) {
+                        match_count += 1;
                     } else if verb_type.contains("一段") && key_parts.iter().any(|&k| k.contains("一段")) {
                         match_count += 1;
+                    } else if verb_type.contains("カ変") && key_parts.iter().any(|&k| k.contains("カ変")) {
+                        match_count += 1;
                     } else if verb_type.contains("サ変") && key_parts.iter().any(|&k| k.contains("サ変")) {
+                        match_count += 1;
+                    } else if verb_type.contains("ラ変") && key_parts.iter().any(|&k| k.contains("ラ変")) {
                         match_count += 1;
                     }
                 }
@@ -199,6 +226,17 @@ fn read_id_def(path: &Path) -> Result<(IdDef, i32), CsvError> {
 
         let mut re = Regex::new(r"五段・カ行[^,]*").unwrap();
         expr = re.replace(&expr, "五段・カ行").to_string();
+
+        re = Regex::new(r"サ変([^,]*)").unwrap();
+        let cap = match re.captures(&expr) {
+            Some(i) => i.get(1).unwrap().as_str(),
+            None => "",
+        };
+        if cap != "" {
+            let mut s1 = String::from("サ変,");
+            s1.push_str(cap);
+            expr = re.replace(&expr, s1).to_string();
+        };
 
         re = Regex::new(r"ラ行([^,]*)").unwrap();
         let cap = match re.captures(&expr) {
@@ -300,9 +338,15 @@ fn get_user_pos_by_id(mapping: &mut PosMapping, id_def: &IdDef, hinshi_id: i32) 
                     let verb_type = parts.get(4).unwrap_or(&"");
                     if verb_type.contains("五段") && key_parts.iter().any(|&k| k.contains("五段")) {
                         match_count += 1;
+                    } else if verb_type.contains("四段") && key_parts.iter().any(|&k| k.contains("四段")) {
+                        match_count += 1;
                     } else if verb_type.contains("一段") && key_parts.iter().any(|&k| k.contains("一段")) {
                         match_count += 1;
+                    } else if verb_type.contains("カ変") && key_parts.iter().any(|&k| k.contains("カ変")) {
+                        match_count += 1;
                     } else if verb_type.contains("サ変") && key_parts.iter().any(|&k| k.contains("サ変")) {
+                        match_count += 1;
+                    } else if verb_type.contains("ラ変") && key_parts.iter().any(|&k| k.contains("ラ変")) {
                         match_count += 1;
                     }
                 }
@@ -331,8 +375,8 @@ fn create_pos_mapping() -> PosMapping {
     mapping.add_mapping("地名", "名詞,固有名詞,地名,*,*,*,*");
     mapping.add_mapping("地名", "名詞,固有名詞,国,*,*,*,*");
     mapping.add_mapping("地名", "名詞,接尾,地域,*,*,*,*");
-    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
     mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
+    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
     mapping.add_mapping("人名", "名詞,固有名詞,人名,*,*,*,*");
     mapping.add_mapping("接尾人名", "接尾辞,人名,*,*,*,*,*");
     mapping.add_mapping("接尾地名", "接尾辞,地名,*,*,*,*,*");
@@ -343,12 +387,12 @@ fn create_pos_mapping() -> PosMapping {
     mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段・マ行,*,*");
     mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段・ラ行,*,*");
     mapping.add_mapping("動詞ワ行五段", "動詞,自立,*,*,五段・ワ行,*,*");
-    mapping.add_mapping("名詞サ変", "名詞,普通名詞,サ変可能,*,*,*,*");
     mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
     mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
     mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
-
     mapping.add_mapping("動詞五段", "動詞,一般,*,*,五段,*,*");
+    mapping.add_mapping("名詞サ変", "名詞,普通名詞,サ変可能,*,*,*,*");
+
     mapping.add_mapping("形容詞", "形容詞,一般,*,*,形容詞,*,*");
     mapping.add_mapping("フィラー", "感動詞,フィラー,*,*,*,*,*");
     mapping.add_mapping("BOS/EOS", "BOS/EOS,*,*,*,*,*,*");
@@ -375,6 +419,7 @@ fn create_pos_mapping() -> PosMapping {
     mapping
 }
 
+// SudachiDict
 fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut class_map = HashMap::<String, i32>::new();
     let mut mapping = create_pos_mapping();
@@ -397,6 +442,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                 if ! symbol_flag && s3 == "空白" { continue };
                 if ! symbol_flag && kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
                 if ! kana_check.is_match(&data[11]) { continue };
+                // 地名を含む場合、オプション指定がなければ、英数のみの地名だけ残し、それ以外は省く。
                 if data[7].contains("地名") {
                     if ! eisuu_check.is_match(&data[0]) && ! chimei_flag { continue };
                 };
@@ -404,8 +450,9 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
                 let s1 = unicode_escape_to_char(&_yomi);
                 let s2 = unicode_escape_to_char(&data[4]);
                 let s4 = &data[6].replace("非自立可能","非自立"); //.replace(r"^数詞$", "数");
-                let s5 = &data[10].replace("形-", "形,");
-                let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], &data[9], s5);
+                let s5 = &data[9].replace("下一段","一段").replace("一段-","一段,").replace("段-","段・");
+                let s6 = &data[10].replace("形-", "形,");
+                let d: String = format!("{},{},{},{},{},{}", s3, s4, &data[7], &data[8], s5, s6);
                 let hinshi = class_map.get(&d);
                 let hinshi_id;
                 if hinshi == None {
@@ -472,6 +519,7 @@ fn u_search_key(mapping: &mut PosMapping, id_def: &mut IdDef, hinshi_id: i32) ->
     get_user_pos_by_id(mapping, id_def, hinshi_id)
 }
 
+// UtDict
 fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let reader = csv::ReaderBuilder::new()
@@ -538,6 +586,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
     Ok(())
 }
 
+// Neologd
 fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let mut class_map = HashMap::<String, i32>::new();
@@ -635,14 +684,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut dict_data = DictionaryData::new();
     let mut opts = getopts::Options::new();
     opts.optflag("h", "help", "this help message");
-    opts.optopt("f", "csv_file", "csv file", "NAME");
-    opts.optopt("i", "id_def", "id_def file path", "NAME");
-    opts.optflag("U", "user_dict", "User dictionary");
-    opts.optflag("s", "sudachi", "Sudachi Dict");
-    opts.optflag("n", "neologd", "Neologd Dict");
-    opts.optflag("u", "utdict", "UT dict");
-    opts.optflag("P", "places", "include Chimei");
-    opts.optflag("S", "Symbols", "include Kigou");
+    opts.optopt("f", "csv_file", "Dictionary Csv file", "NAME");
+    opts.optopt("i", "id_def", "Mozc id.def file path", "NAME");
+    opts.optflag("U", "user_dict", "Generate Mozc User Dictionary Formats");
+    opts.optflag("s", "sudachi", "Sudachi Dictionary");
+    opts.optflag("n", "neologd", "Neologd Dictitonary");
+    opts.optflag("u", "utdict", "UT Dictionary");
+    opts.optflag("P", "places", "Includes Chimei(Places Name)");
+    opts.optflag("S", "Symbols", "Includes Kigou(Symbols)");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,

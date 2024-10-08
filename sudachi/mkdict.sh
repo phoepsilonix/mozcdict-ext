@@ -28,24 +28,23 @@ mkdir -p csv
 echo $@
 SYSTEMDIC=mozcdic-ut-sudachidict
 USERDIC=user_dic-ut-sudachidict
-source <(cargo +nightly -Z unstable-options rustc --print cfg|grep -E "target_(arch|vendor|os|env)")
-TARGET="${target_arch}-${target_vendor}-${target_os}-${target_env}"
-cargo +stable build --release --target $TARGET
+#source <(cargo +nightly -Z unstable-options rustc --print cfg|grep -E "target_(arch|vendor|os|env)")
+#TARGET="${target_arch}-${target_vendor}-${target_os}-${target_env}"
+cargo build --release
 PROG=$(find target -name dict-to-mozc)
 echo "PROG=" $PROG
 
 cat csv/small_lex.csv csv/core_lex.csv csv/notcore_lex.csv > all.csv
 
-# ut dic
-$PROG -i ../id.def -f ./all.csv -s > ./$SYSTEMDIC.tmp
-awk -f ./dup.awk ./$SYSTEMDIC.tmp > ./$SYSTEMDIC.txt
-rm ./$SYSTEMDIC.tmp
+wget -nc https://github.com/google/mozc/raw/refs/heads/master/src/data/dictionary_oss/id.def
+
+# SudachiDict
+$PROG -i ./id.def -f ./all.csv -s > ./$SYSTEMDIC.txt
 
 # userdic
-$PROG -i ../id.def -f all.csv -s -U ../user_dic_id.def > ./$USERDIC.tmp
-awk -f ./dup_u.awk ./$USERDIC.tmp > ./$USERDIC
+$PROG -i ./id.def -f all.csv -s -U > ./$USERDIC
 split --numeric-suffixes=1 -l 1000000 --additional-suffix=.txt $USERDIC $USERDIC-
-rm $USERDIC $USERDIC.tmp
+rm $USERDIC
 
 mkdir -p ../release
 [[ -e ../release/${USERDIC}.tar.xz ]] && rm ../release/${USERDIC}.tar.xz
