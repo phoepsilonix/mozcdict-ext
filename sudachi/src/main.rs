@@ -350,7 +350,7 @@ fn create_pos_mapping() -> PosMapping {
     mapping
 }
 
-fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_data: &mut DictionaryData, chimei_flag: bool) -> Result<(), csv::Error> {
+fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut class_map = HashMap::<String, i32>::new();
     let mut mapping = create_pos_mapping();
     let reader = csv::ReaderBuilder::new()
@@ -367,9 +367,9 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_
             Ok(record) => {
                 let data = record;
                 let s3 = &data[5].replace("補助記号", "記号"); //.replace("空白","記号");
-                if &data[11] == "キゴウ" && s3.contains("記号") { continue };
-                if s3 == "空白" { continue };
-                if kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
+                if ! symbol_flag && &data[11] == "キゴウ" && s3.contains("記号") { continue };
+                if ! symbol_flag && s3 == "空白" { continue };
+                if ! symbol_flag && kigou_check.is_match(&data[4]) && ! (&data[6] == "固有名詞") { continue };
                 if ! kana_check.is_match(&data[11]) { continue };
                 if ! chimei_flag && data[7].contains("地名") { continue };
                 let mut _yomi: String = convert_to_hiragana(&data[11]);
@@ -444,7 +444,7 @@ fn u_search_key(mapping: &mut PosMapping, id_def: &mut IdDef, hinshi_id: i32) ->
     get_user_pos_by_id(mapping, id_def, hinshi_id)
 }
 
-fn utdict_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_data: &mut DictionaryData, chimei_flag: bool) -> Result<(), csv::Error> {
+fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let reader = csv::ReaderBuilder::new()
         .has_headers(false)
@@ -460,7 +460,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_d
                 let data = record;
                 if ! kana_check.is_match(&data[0]) { continue };
                 let hinshi_id = data[1].parse::<i32>().unwrap();
-                if kigou_check.is_match(&data[0]) && ! search_key(&id_def, hinshi_id).contains("固有名詞") { continue };
+                if ! symbol_flag && kigou_check.is_match(&data[0]) && ! search_key(&id_def, hinshi_id).contains("固有名詞") { continue };
                 if search_key(&id_def, hinshi_id).contains("地名") && ! chimei_flag { continue }
                 let mut _yomi: String = convert_to_hiragana(&data[0]);
                 let s1 = unicode_escape_to_char(&_yomi);
@@ -494,7 +494,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_d
     Ok(())
 }
 
-fn neologd_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_data: &mut DictionaryData, chimei_flag: bool) -> Result<(), csv::Error> {
+fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let mut class_map = HashMap::<String, i32>::new();
     let reader = csv::ReaderBuilder::new()
@@ -512,7 +512,7 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, user_dict_flag: bool, dict_
                 let data = record;
                 if &data[11] == "キゴウ" && data[10].contains("記号") { continue };
                 if &data[4] == "空白" { continue };
-                if kigou_check.is_match(&data[0]) && ! (&data[5] == "固有名詞") { continue };
+                if ! symbol_flag && kigou_check.is_match(&data[0]) && ! (&data[5] == "固有名詞") { continue };
                 if ! kana_check.is_match(&data[11]) { continue };
                 if ! chimei_flag && data[6].contains("地域") { continue };
                 let mut _yomi: String = convert_to_hiragana(&data[11]);
@@ -582,6 +582,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     opts.optflag("n", "neologd", "Neologd Dict");
     opts.optflag("u", "utdict", "UT dict");
     opts.optflag("P", "places", "include Chimei");
+    opts.optflag("S", "Symbols", "include Kigou");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -608,24 +609,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let user_dict_flag = matches.opt_present("user_dict");
     let chimei_flag = matches.opt_present("places");
+    let symbol_flag = matches.opt_present("Symbols");
     if matches.opt_present("sudachi") && ! user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        sudachi_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("utdict") && ! user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        utdict_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("neologd") && ! user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        neologd_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("sudachi") && user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        sudachi_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("utdict") && user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        utdict_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     } else if matches.opt_present("neologd") && user_dict_flag {
         let mut id_def = read_id_def(&id_def_path)?;
-        neologd_read_csv(&csv_path, &mut id_def, user_dict_flag, &mut dict_data, chimei_flag)?;
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
     }
     dict_data.output(user_dict_flag)?;
 
