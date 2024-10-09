@@ -17,7 +17,6 @@ use crate::utils::adjust_cost;
 mod utils {
     use super::*;
 
-
     // カタカナから読みを平仮名へ
     pub fn convert_to_hiragana(text: &str) -> String {
         let target: Vec<char> = text.chars().collect();
@@ -666,36 +665,54 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
     Ok(())
 }
 
-use pico_args::Arguments;
+use argh::FromArgs;
 
-struct Opt {
+#[derive(FromArgs)]
+/// Dictionary to Mozc Dictionary Formats: a tool for processing dictionary files
+struct Args {
+    /// path to the dictionary CSV file
+    #[argh(option, short = 'f')]
     csv_file: Option<PathBuf>,
+
+    /// path to the Mozc id.def file
+    #[argh(option, short = 'i')]
     id_def: Option<PathBuf>,
+
+    /// generate Mozc User Dictionary formats
+    #[argh(switch, short = 'U')]
     user_dict: bool,
+
+    /// target SudachiDict
+    #[argh(switch, short = 's')]
     sudachi: bool,
+
+    /// target NEologd dictionary
+    #[argh(switch, short = 'n')]
     neologd: bool,
+
+    /// target UT dictionary
+    #[argh(switch, short = 'u')]
     utdict: bool,
+
+    /// include place names (chimei)
+    #[argh(switch, short = 'P')]
     places: bool,
+
+    /// include symbols (kigou)
+    #[argh(switch, short = 'S')]
     symbols: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = Arguments::from_env();
-
-    let opt = Opt {
-        csv_file: args.opt_value_from_str(["-f", "--csv_file"])?,
-        id_def: args.opt_value_from_str(["-i", "--id_def"])?,
-        user_dict: args.contains(["-U", "--user_dict"]),
-        sudachi: args.contains(["-s", "--sudachi"]),
-        neologd: args.contains(["-n", "--neologd"]),
-        utdict: args.contains(["-u", "--utdict"]),
-        places: args.contains(["-P", "--places"]),
-        symbols: args.contains(["-S", "--symbols"]),
-    };
+    let args: Args = argh::from_env();
 
     let current_dir = std::env::current_dir()?;
-    let csv_path = opt.csv_file.unwrap_or_else(|| current_dir.join("all.csv"));
-    let id_def_path = opt.id_def.unwrap_or_else(|| current_dir.join("id.def"));
+    
+    // CSVファイルのパスを取得
+    let csv_path = args.csv_file.unwrap_or_else(|| current_dir.join("all.csv"));
+    
+    // id.defファイルのパスを取得
+    let id_def_path = args.id_def.unwrap_or_else(|| current_dir.join("id.def"));
 
     // ファイルの存在チェック
     if !csv_path.exists() {
@@ -709,17 +726,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut dict_data = DictionaryData::new();
+    
+    // id.defの読み込み
     let (mut id_def, default_noun_id) = read_id_def(&id_def_path)?;
 
-    if opt.sudachi {
-        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, opt.user_dict, opt.places, opt.symbols)?;
-    } else if opt.utdict {
-        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, opt.user_dict, opt.places, opt.symbols)?;
-    } else if opt.neologd {
-        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, opt.user_dict, opt.places, opt.symbols)?;
+    // 辞書の読み込み処理
+    if args.sudachi {
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, args.user_dict, args.places, args.symbols)?;
+    } else if args.utdict {
+        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, args.user_dict, args.places, args.symbols)?;
+    } else if args.neologd {
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, args.user_dict, args.places, args.symbols)?;
     }
 
-    dict_data.output(opt.user_dict)?;
+    // 辞書データの出力
+    dict_data.output(args.user_dict)?;
 
     Ok(())
 }

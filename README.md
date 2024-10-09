@@ -2,6 +2,20 @@
 # 目的
 mozcのパッケージ作成において、システム辞書として、有志が公開してくださっている辞書を含めることが目的です。  
 
+主にSudachiDictをシステム辞書として、組み込むことを目的とします。
+cd sudachi/以下のrustプログラムが、SudachiDictをはじめとする辞書データを、Mozcのシステム辞書およびユーザー辞書型式へ変換するプログラムです。
+
+1. SudachiDictのそれぞれのファイルをまとめたものをall.csvファイルとした場合の使用例です。
+```sh
+cd sudachi
+cargo build --release
+curl -LO https://github.com/google/mozc/raw/refs/heads/master/src/data/dictionary_oss/id.def
+./target/release/dict-to-mozc -s -i ./id.def -f all.csv > all-dict.txt
+./target/release/dict-to-mozc -s -i ./id.def -f all.csv -U > all-userdict.txt
+```
+
+下記は、過去の履歴として、残します。
+---
 下記サイトに、まとめてくださっています。感謝です。  
 - [Merge UT Dictionaries merges multiple Mozc UT dictionaries into one and modify the costs.](https://github.com/utuhiro78/merge-ut-dictionaries)  
 このレポジトリにおいては、上記で公開されているUT辞書と、 
