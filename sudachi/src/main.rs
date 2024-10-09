@@ -1,88 +1,19 @@
-use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
 use std::env;
-use std::io;
-use std::io::Write;
+use std::io::{Result as ioResult, stdout, BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+
 use regex::Regex;
 use lazy_regex::regex_replace_all;
+
 use csv::{ReaderBuilder, Error as CsvError};
+
 use encoding_rs::UTF_8;
 use unicode_normalization::UnicodeNormalization;
 
-use std::result::Result; // 標準ライブラリのResultを明示的にインポート
-
-// 結果構造体
-// yomi,surface,hinshi_idの組み合わせで重複チェックされる。
-#[derive(Hash, Eq, PartialEq, Clone)]
-struct DictionaryKey {
-    yomi: String,
-    surface: String,
-    hinshi_id: i32,
-}
-
-// コストと品詞判定で判明した品詞の文字列
-struct DictionaryEntry {
-    key: DictionaryKey,
-    cost: i32,
-    pos: String,
-}
-
-// システム辞書型式とユーザー辞書型式
-struct DictionaryData {
-    entries: HashMap<DictionaryKey, DictionaryEntry>,
-    user_entries: HashMap<DictionaryKey, DictionaryEntry>,
-}
-
-impl DictionaryData {
-    fn new() -> Self {
-        Self {
-            entries: HashMap::new(),
-            user_entries: HashMap::new(),
-        }
-    }
-
-    fn add(&mut self, entry: DictionaryEntry, is_user_dict: bool) {
-        let target = if is_user_dict { &mut self.user_entries } else { &mut self.entries };
-        target.insert(entry.key.clone(), entry);
-    }
-
-    fn output(&self, user_dict: bool) -> io::Result<()> {
-        let mut writer = io::BufWriter::new(io::stdout());
-
-        // システム辞書のエントリーを出力
-        if ! user_dict {
-            for entry in self.entries.values() {
-                writeln!(
-                    writer,
-                    "{}\t{}\t{}\t{}\t{}",
-                    entry.key.yomi, entry.key.hinshi_id, entry.key.hinshi_id, entry.cost, entry.key.surface
-                )?;
-            }
-        } else {
-            // -Uオプションが設定されている場合のみユーザー辞書を出力
-            for entry in self.user_entries.values() {
-                if !self.entries.contains_key(&entry.key) {
-                    writeln!(
-                        writer,
-                        "{}\t{}\t{}\t{}",
-                        entry.key.yomi, entry.key.surface, entry.pos, "".to_string()
-                    )?;
-                }
-            }
-        }
-
-        writer.flush()
-    }
-}
-// Mozc ソースに含まれるsrc/data/dictionary_oss/id.def
-// 更新される可能性がある。
-type IdDef = HashMap<String, i32>;
-
-const DEFAULT_COST: i32 = 6000;
-const MIN_COST: i32 = 0;
-const MAX_COST: i32 = 10000;
-const COST_ADJUSTMENT: i32 = 10;
+use crate::utils::convert_to_hiragana;
+use crate::utils::unicode_escape_to_char;
+use crate::utils::adjust_cost;
 
 mod utils {
     use super::*;
@@ -128,9 +59,77 @@ mod utils {
     }
 }
 
-use crate::utils::convert_to_hiragana;
-use crate::utils::unicode_escape_to_char;
-use crate::utils::adjust_cost;
+// 結果構造体
+// yomi,surface,hinshi_idの組み合わせで重複チェックされる。
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct DictionaryKey {
+    yomi: String,
+    surface: String,
+    hinshi_id: i32,
+}
+
+// コストと品詞判定で判明した品詞の文字列
+struct DictionaryEntry {
+    key: DictionaryKey,
+    cost: i32,
+    pos: String,
+}
+
+// システム辞書型式とユーザー辞書型式
+struct DictionaryData {
+    entries: HashMap<DictionaryKey, DictionaryEntry>,
+    user_entries: HashMap<DictionaryKey, DictionaryEntry>,
+}
+
+impl DictionaryData {
+    fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+            user_entries: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, entry: DictionaryEntry, is_user_dict: bool) {
+        let target = if is_user_dict { &mut self.user_entries } else { &mut self.entries };
+        target.insert(entry.key.clone(), entry);
+    }
+
+    fn output(&self, user_dict: bool) -> ioResult<()> {
+        let mut writer = BufWriter::new(stdout());
+
+        // システム辞書のエントリーを出力
+        if ! user_dict {
+            for entry in self.entries.values() {
+                writeln!(
+                    writer,
+                    "{}\t{}\t{}\t{}\t{}",
+                    entry.key.yomi, entry.key.hinshi_id, entry.key.hinshi_id, entry.cost, entry.key.surface
+                )?;
+            }
+        } else {
+            // -Uオプションが設定されている場合のみユーザー辞書を出力
+            for entry in self.user_entries.values() {
+                if !self.entries.contains_key(&entry.key) {
+                    writeln!(
+                        writer,
+                        "{}\t{}\t{}\t{}",
+                        entry.key.yomi, entry.key.surface, entry.pos, "".to_string()
+                    )?;
+                }
+            }
+        }
+
+        writer.flush()
+    }
+}
+// Mozc ソースに含まれるsrc/data/dictionary_oss/id.def
+// 更新される可能性がある。
+type IdDef = HashMap<String, i32>;
+
+const DEFAULT_COST: i32 = 6000;
+const MIN_COST: i32 = 0;
+const MAX_COST: i32 = 10000;
+const COST_ADJUSTMENT: i32 = 10;
 
 // 辞書データの品詞情報とid.defを比較して品詞のidを確定する。
 fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut HashMap<String, i32>, default_noun_id: i32) -> i32 {
@@ -203,6 +202,9 @@ fn id_expr(clsexpr: &str, id_def: &mut HashMap<String, i32>, class_map: &mut Has
     result_id
 }
 
+// id.defは更新されうるので、毎回、最新のものを読み込む。
+// 品詞判定が出来なかった場合、普通名詞とみなす。
+// default_noun_idは、その普通名詞のIDを格納しておく。
 fn read_id_def(path: &Path) -> Result<(IdDef, i32), CsvError> {
     let mut hash = IdDef::new();
     let mut reader = ReaderBuilder::new()
@@ -265,6 +267,7 @@ fn read_id_def(path: &Path) -> Result<(IdDef, i32), CsvError> {
     Ok((hash, default_noun_id))
 }
 
+// ユーザー辞書の品詞と、id.defの品詞のマッピングを作成する
 struct PosMapping {
     user_to_id_def: HashMap<String, Vec<String>>,
     id_def_to_user: HashMap<String, String>,
@@ -288,6 +291,61 @@ impl PosMapping {
     }
 }
 
+// マッピング作成
+fn create_pos_mapping() -> PosMapping {
+    let mut mapping = PosMapping::new();
+
+    // ユーザー辞書の品詞とid.defの品詞のマッピングを追加
+    mapping.add_mapping("固有名詞", "名詞,固有名詞,一般,*,*,*,*");
+    mapping.add_mapping("組織", "名詞,固有名詞,組織,*,*,*,*");
+    mapping.add_mapping("地名", "名詞,固有名詞,地名,*,*,*,*");
+    mapping.add_mapping("地名", "名詞,固有名詞,国,*,*,*,*");
+    mapping.add_mapping("地名", "名詞,接尾,地域,*,*,*,*");
+    mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
+    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
+    mapping.add_mapping("人名", "名詞,固有名詞,人名,*,*,*,*");
+    mapping.add_mapping("接尾人名", "接尾辞,人名,*,*,*,*,*");
+    mapping.add_mapping("接尾地名", "接尾辞,地名,*,*,*,*,*");
+    mapping.add_mapping("動詞カ行五段", "動詞,一般,*,*,五段・カ行,*,*");
+    mapping.add_mapping("動詞カ変", "動詞,一般,*,*,カ変,*,*");
+    mapping.add_mapping("動詞サ行五段", "動詞,一般,*,*,五段・サ行,*,*");
+    mapping.add_mapping("動詞ハ行四", "動詞,非自立,*,*,四段・ハ行,*,*");
+    mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段・マ行,*,*");
+    mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段・ラ行,*,*");
+    mapping.add_mapping("動詞ワ行五段", "動詞,自立,*,*,五段・ワ行,*,*");
+    mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
+    mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
+    mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
+    mapping.add_mapping("動詞五段", "動詞,一般,*,*,五段,*,*");
+    mapping.add_mapping("名詞サ変", "名詞,普通名詞,サ変可能,*,*,*,*");
+
+    mapping.add_mapping("形容詞", "形容詞,一般,*,*,形容詞,*,*");
+    mapping.add_mapping("フィラー", "感動詞,フィラー,*,*,*,*,*");
+    mapping.add_mapping("BOS/EOS", "BOS/EOS,*,*,*,*,*,*");
+    mapping.add_mapping("その他", "その他,*,*,*,*,*,*");
+    mapping.add_mapping("感動詞", "感動詞,*,*,*,*,*,*");
+    mapping.add_mapping("助詞", "助詞,*,*,*,*,*,*");
+    mapping.add_mapping("助動詞", "助動詞,*,*,*,*,*,*");
+    mapping.add_mapping("終助詞", "助詞,終助詞,*,*,*,*,*");
+    mapping.add_mapping("名詞", "名詞,普通名詞,*,*,*,*,*");
+    mapping.add_mapping("固有名詞", "名詞,固有名詞,*,*,*,*,*");
+    mapping.add_mapping("数", "名詞,数詞,*,*,*,*,*");
+    mapping.add_mapping("助数詞", "名詞,数詞,*,*,*,*,*");
+    mapping.add_mapping("接尾一般", "接尾辞,*,*,*,*,*,*");
+    mapping.add_mapping("接続詞", "接続詞,*,*,*,*,*,*");
+    mapping.add_mapping("接頭語", "接頭辞,*,*,*,*,*,*");
+    mapping.add_mapping("副詞", "副詞,*,*,*,*,*,*");
+    mapping.add_mapping("形容詞", "形容詞,*,*,*,*,*,*");
+    mapping.add_mapping("記号", "補助記号,*,*,*,*,*,*");
+    mapping.add_mapping("名詞形動", "形状詞,*,*,*,*,*,*");
+    mapping.add_mapping("連体詞", "連体詞,*,*,*,*,*,*");
+    mapping.add_mapping("動詞", "動詞,*,*,*,*,*,*");
+    mapping.add_mapping("記号", "記号,*,*,*,*,*,*");
+
+    mapping
+}
+
+// hinshi_idからユーザー辞書の品詞の判定
 fn get_user_pos_by_id(mapping: &mut PosMapping, id_def: &IdDef, hinshi_id: i32) -> Option<String> {
     // キャッシュをチェック
     if let Some(cached_pos) = mapping.id_to_user_pos_cache.get(&hinshi_id) {
@@ -366,60 +424,24 @@ fn get_user_pos_by_id(mapping: &mut PosMapping, id_def: &IdDef, hinshi_id: i32) 
     result
 }
 
-fn create_pos_mapping() -> PosMapping {
-    let mut mapping = PosMapping::new();
-
-    // ユーザー辞書の品詞とid.defの品詞のマッピングを追加
-    mapping.add_mapping("固有名詞", "名詞,固有名詞,一般,*,*,*,*");
-    mapping.add_mapping("組織", "名詞,固有名詞,組織,*,*,*,*");
-    mapping.add_mapping("地名", "名詞,固有名詞,地名,*,*,*,*");
-    mapping.add_mapping("地名", "名詞,固有名詞,国,*,*,*,*");
-    mapping.add_mapping("地名", "名詞,接尾,地域,*,*,*,*");
-    mapping.add_mapping("名", "名詞,固有名詞,人名,名,*,*,*");
-    mapping.add_mapping("姓", "名詞,固有名詞,人名,姓,*,*,*");
-    mapping.add_mapping("人名", "名詞,固有名詞,人名,*,*,*,*");
-    mapping.add_mapping("接尾人名", "接尾辞,人名,*,*,*,*,*");
-    mapping.add_mapping("接尾地名", "接尾辞,地名,*,*,*,*,*");
-    mapping.add_mapping("動詞カ行五段", "動詞,一般,*,*,五段・カ行,*,*");
-    mapping.add_mapping("動詞カ変", "動詞,一般,*,*,カ変,*,*");
-    mapping.add_mapping("動詞サ行五段", "動詞,一般,*,*,五段・サ行,*,*");
-    mapping.add_mapping("動詞ハ行四", "動詞,非自立,*,*,四段・ハ行,*,*");
-    mapping.add_mapping("動詞マ行五段", "動詞,一般,*,*,五段・マ行,*,*");
-    mapping.add_mapping("動詞ラ行五段", "動詞,一般,*,*,五段・ラ行,*,*");
-    mapping.add_mapping("動詞ワ行五段", "動詞,自立,*,*,五段・ワ行,*,*");
-    mapping.add_mapping("動詞一段", "動詞,一般,*,*,一段,*,*");
-    mapping.add_mapping("動詞サ変", "動詞,一般,*,*,サ変,*,*");
-    mapping.add_mapping("動詞ラ変", "動詞,自立,*,*,ラ変,*,*");
-    mapping.add_mapping("動詞五段", "動詞,一般,*,*,五段,*,*");
-    mapping.add_mapping("名詞サ変", "名詞,普通名詞,サ変可能,*,*,*,*");
-
-    mapping.add_mapping("形容詞", "形容詞,一般,*,*,形容詞,*,*");
-    mapping.add_mapping("フィラー", "感動詞,フィラー,*,*,*,*,*");
-    mapping.add_mapping("BOS/EOS", "BOS/EOS,*,*,*,*,*,*");
-    mapping.add_mapping("その他", "その他,*,*,*,*,*,*");
-    mapping.add_mapping("感動詞", "感動詞,*,*,*,*,*,*");
-    mapping.add_mapping("助詞", "助詞,*,*,*,*,*,*");
-    mapping.add_mapping("助動詞", "助動詞,*,*,*,*,*,*");
-    mapping.add_mapping("終助詞", "助詞,終助詞,*,*,*,*,*");
-    mapping.add_mapping("名詞", "名詞,普通名詞,*,*,*,*,*");
-    mapping.add_mapping("固有名詞", "名詞,固有名詞,*,*,*,*,*");
-    mapping.add_mapping("数", "名詞,数詞,*,*,*,*,*");
-    mapping.add_mapping("助数詞", "名詞,数詞,*,*,*,*,*");
-    mapping.add_mapping("接尾一般", "接尾辞,*,*,*,*,*,*");
-    mapping.add_mapping("接続詞", "接続詞,*,*,*,*,*,*");
-    mapping.add_mapping("接頭語", "接頭辞,*,*,*,*,*,*");
-    mapping.add_mapping("副詞", "副詞,*,*,*,*,*,*");
-    mapping.add_mapping("形容詞", "形容詞,*,*,*,*,*,*");
-    mapping.add_mapping("記号", "補助記号,*,*,*,*,*,*");
-    mapping.add_mapping("名詞形動", "形状詞,*,*,*,*,*,*");
-    mapping.add_mapping("連体詞", "連体詞,*,*,*,*,*,*");
-    mapping.add_mapping("動詞", "動詞,*,*,*,*,*,*");
-    mapping.add_mapping("記号", "記号,*,*,*,*,*,*");
-
-    mapping
+// id.defからキーを検索
+fn search_key(def: &HashMap::<String, i32>, search: i32) -> String {
+    for (key, value) in def {
+        if value == &search {
+            return key.to_string();
+        } else {
+            continue;
+        }
+    }
+    return "".to_string();
 }
 
-// SudachiDict
+// ユーザー辞書から品詞idの検索
+fn u_search_key(mapping: &mut PosMapping, id_def: &mut IdDef, hinshi_id: i32) -> Option<String> {
+    get_user_pos_by_id(mapping, id_def, hinshi_id)
+}
+
+// SudachiDict読み込み
 fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut class_map = HashMap::<String, i32>::new();
     let mut mapping = create_pos_mapping();
@@ -504,22 +526,7 @@ fn sudachi_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
     Ok(())
 }
 
-fn search_key(def: &HashMap::<String, i32>, search: i32) -> String {
-    for (key, value) in def {
-        if value == &search {
-            return key.to_string();
-        } else {
-            continue;
-        }
-    }
-    return "".to_string();
-}
-
-fn u_search_key(mapping: &mut PosMapping, id_def: &mut IdDef, hinshi_id: i32) -> Option<String> {
-    get_user_pos_by_id(mapping, id_def, hinshi_id)
-}
-
-// UtDict
+// UtDict読み込み
 fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let reader = csv::ReaderBuilder::new()
@@ -586,7 +593,7 @@ fn utdict_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryDa
     Ok(())
 }
 
-// Neologd
+// Neologd読み込み
 fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryData, default_noun_id: i32, user_dict_flag: bool, chimei_flag: bool, symbol_flag: bool) -> Result<(), csv::Error> {
     let mut mapping = create_pos_mapping();
     let mut class_map = HashMap::<String, i32>::new();
