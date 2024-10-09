@@ -1,4 +1,3 @@
-use std::env;
 use std::io::{Result as ioResult, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
@@ -679,66 +678,60 @@ fn neologd_read_csv(path: &Path, id_def: &mut IdDef, dict_data: &mut DictionaryD
     Ok(())
 }
 
-fn brief(program: &str) -> String {
-    format!(
-        "Usage: {} [options]\n\n{}",
-        program, "Reads markdown from file or standard input and emits HTML.",
-    )
+use pico_args::Arguments;
+
+struct Opt {
+    csv_file: Option<PathBuf>,
+    id_def: Option<PathBuf>,
+    user_dict: bool,
+    sudachi: bool,
+    neologd: bool,
+    utdict: bool,
+    places: bool,
+    symbols: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<_> = env::args().collect();
-    let mut dict_data = DictionaryData::new();
-    let mut opts = getopts::Options::new();
-    opts.optflag("h", "help", "this help message");
-    opts.optopt("f", "csv_file", "Dictionary Csv file", "NAME");
-    opts.optopt("i", "id_def", "Mozc id.def file path", "NAME");
-    opts.optflag("U", "user_dict", "Generate Mozc User Dictionary Formats");
-    opts.optflag("s", "sudachi", "Sudachi Dictionary");
-    opts.optflag("n", "neologd", "Neologd Dictitonary");
-    opts.optflag("u", "utdict", "UT Dictionary");
-    opts.optflag("P", "places", "Includes Chimei(Places Name)");
-    opts.optflag("S", "Symbols", "Includes Kigou(Symbols)");
+    let mut args = Arguments::from_env();
 
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => m,
-        Err(f) => { panic!("{}", f.to_string()) }
+    let opt = Opt {
+        csv_file: args.opt_value_from_str(["-f", "--csv_file"])?,
+        id_def: args.opt_value_from_str(["-i", "--id_def"])?,
+        user_dict: args.contains(["-U", "--user_dict"]),
+        sudachi: args.contains(["-s", "--sudachi"]),
+        neologd: args.contains(["-n", "--neologd"]),
+        utdict: args.contains(["-u", "--utdict"]),
+        places: args.contains(["-P", "--places"]),
+        symbols: args.contains(["-S", "--symbols"]),
     };
-    if matches.opt_present("help") {
-        println!("{}", opts.usage(&brief(&args[0])));
-        return Ok(());
+
+    let current_dir = std::env::current_dir()?;
+    let csv_path = opt.csv_file.unwrap_or_else(|| current_dir.join("all.csv"));
+    let id_def_path = opt.id_def.unwrap_or_else(|| current_dir.join("id.def"));
+
+    // ファイルの存在チェック
+    if !csv_path.exists() {
+        eprintln!("Error: CSV file not found at {:?}", csv_path);
+        return Err("CSV file not found".into());
     }
 
-    let current_dir = env::current_dir()?;
-    let mut csv_path = current_dir.join("all.csv");
-    let mut id_def_path = current_dir.join("id.def");
-
-    if let Some(csv_file) = matches.opt_str("csv_file") {
-        csv_path = PathBuf::from(csv_file);
+    if !id_def_path.exists() {
+        eprintln!("Error: id.def file not found at {:?}", id_def_path);
+        return Err("id.def file not found".into());
     }
 
-    if let Some(id_def_file) = matches.opt_str("id_def") {
-        id_def_path = PathBuf::from(id_def_file);
-    }
-
-    let user_dict_flag = matches.opt_present("user_dict");
-    let chimei_flag = matches.opt_present("places");
-    let symbol_flag = matches.opt_present("Symbols");
+    let mut dict_data = DictionaryData::new();
     let (mut id_def, default_noun_id) = read_id_def(&id_def_path)?;
-    if matches.opt_present("sudachi") && ! user_dict_flag {
-        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
-    } else if matches.opt_present("utdict") && ! user_dict_flag {
-        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
-    } else if matches.opt_present("neologd") && ! user_dict_flag {
-        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
-    } else if matches.opt_present("sudachi") && user_dict_flag {
-        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
-    } else if matches.opt_present("utdict") && user_dict_flag {
-        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, user_dict_flag, chimei_flag, symbol_flag)?;
-    } else if matches.opt_present("neologd") && user_dict_flag {
-        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, user_dict_flag, chimei_flag, symbol_flag)?;
+
+    if opt.sudachi {
+        sudachi_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, opt.user_dict, opt.places, opt.symbols)?;
+    } else if opt.utdict {
+        utdict_read_csv(&csv_path, &mut id_def, &mut dict_data, opt.user_dict, opt.places, opt.symbols)?;
+    } else if opt.neologd {
+        neologd_read_csv(&csv_path, &mut id_def, &mut dict_data, default_noun_id, opt.user_dict, opt.places, opt.symbols)?;
     }
-    dict_data.output(user_dict_flag)?;
+
+    dict_data.output(opt.user_dict)?;
 
     Ok(())
 }
