@@ -9,11 +9,10 @@ authors = ["Masato TOYOSHIMA", "phoepsilonix <phoepsilonix@gmail.com>"]
 
 [dependencies]
 csv = "1.3.0"
-encoding_rs = "0.8.34"
+kanaria = { git = "https://github.com/phoepsilonix/kanaria.git", version = "0.2.0", commit="c6abb4755e50b4c66b9f299ff417252f9e2d088d" }
 lazy-regex = "3.1.0"
 pico-args = "0.5.0"
 regex = "1.10.3"
-unicode-normalization = "0.1.24"
 
 [profile.release]
 strip = "symbols"

@@ -1,0 +1,3 @@
+[submodule "sudachi/kanaria"]
+	path = sudachi/kanaria
+	url = https://github.com/samunohito/kanaria.git

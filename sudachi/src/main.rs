@@ -7,8 +7,8 @@ use lazy_regex::regex_replace_all;
 
 use csv::{ReaderBuilder, Error as CsvError};
 
-use encoding_rs::UTF_8;
-use unicode_normalization::UnicodeNormalization;
+use kanaria::string::{UCSStr, ConvertType};
+use kanaria::utils::ConvertTarget;
 
 use crate::utils::convert_to_hiragana;
 use crate::utils::unicode_escape_to_char;
@@ -20,22 +20,10 @@ mod utils {
 
     // カタカナから読みを平仮名へ
     pub fn convert_to_hiragana(text: &str) -> String {
-        let (cow, _, _) = UTF_8.encode(text);
-        let decoded = UTF_8.decode(&cow).0;
-        let normalized = decoded.nfkc().collect::<String>();
-        normalized
-            .chars()
-            .map(|c| match c {
-                'ァ'..='ヶ' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
-                'ヷ' => 'わ',
-                'ヸ' => 'ゐ',
-                'ヹ' => 'ゑ',
-                'ヺ' => 'を',
-                _ => c,
-            })
-        .collect::<String>()
-            .replace("ゐ", "い")
-            .replace("ゑ", "え")
+        let target: Vec<char> = text.chars().collect();
+        let mut yomi: String = UCSStr::convert(&target, ConvertType::Hiragana, ConvertTarget::ALL).iter().collect();
+        yomi = yomi.replace("ゐ", "い").replace("ゑ", "え");
+        yomi
     }
 
     // Unicode Escapeの記述が含まれる場合、それを変換する。
